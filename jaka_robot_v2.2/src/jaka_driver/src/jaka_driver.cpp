@@ -1,37 +1,37 @@
-#include "ros/ros.h"
-#include "std_msgs/String.h"
-#include "std_srvs/Empty.h"
-#include "std_srvs/SetBool.h"
-#include "geometry_msgs/TwistStamped.h"
-#include "sensor_msgs/JointState.h"
+#include "rclcpp/rclcpp.hpp"
+// #include "std_msgs/msg/string.hpp"
+#include "std_srvs/srv/empty.hpp"
+#include "std_srvs/srv/set_bool.hpp"
+#include "geometry_msgs/msg/twist_stamped.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
 
 #include "Eigen/Dense"
 #include "Eigen/Core"
 #include "Eigen/Geometry"
 #include "Eigen/StdVector"
 
-#include "jaka_msgs/RobotMsg.h"
-#include "jaka_msgs/Move.h"
-#include "jaka_msgs/ServoMoveEnable.h"
-#include "jaka_msgs/ServoMove.h"
-#include "jaka_msgs/SetUserFrame.h"
-#include "jaka_msgs/SetTcpFrame.h"
-#include "jaka_msgs/SetPayload.h"
-#include "jaka_msgs/SetCollision.h"
-#include "jaka_msgs/SetIO.h"
-#include "jaka_msgs/GetIO.h"
-#include "jaka_msgs/GetFK.h"
-#include "jaka_msgs/GetIK.h"
-#include "jaka_msgs/ClearError.h"
+#include "jaka_msgs/msg/robot_msg.hpp"
+#include "jaka_msgs/srv/move.hpp"
+#include "jaka_msgs/srv/servo_move_enable.hpp"
+#include "jaka_msgs/srv/servo_move.hpp"
+#include "jaka_msgs/srv/set_user_frame.hpp"
+#include "jaka_msgs/srv/set_tcp_frame.hpp"
+#include "jaka_msgs/srv/set_payload.hpp"
+#include "jaka_msgs/srv/set_collision.hpp"
+#include "jaka_msgs/srv/set_io.hpp"
+#include "jaka_msgs/srv/get_io.hpp"
+#include "jaka_msgs/srv/get_ik.hpp"
+#include "jaka_msgs/srv/get_fk.hpp"
+#include "jaka_msgs/srv/clear_error.hpp"
 
 #include "jaka_driver/JAKAZuRobot.h"
 #include "jaka_driver/jkerr.h"
 #include "jaka_driver/jktypes.h"
 #include "jaka_driver/conversion.h"
 
-#include <actionlib/server/simple_action_server.h>
-#include <control_msgs/FollowJointTrajectoryAction.h>
-#include <trajectory_msgs/JointTrajectory.h>
+// #include <actionlib/server/simple_action_server.h>
+// #include <control_msgs/FollowJointTrajectoryAction.h>
+// #include <trajectory_msgs/JointTrajectory.h>
 
 #include <string>
 #include <map>
@@ -64,23 +64,23 @@ map<int, string>mapErr = {
     {-12,"ERR_MOTION_ABNORMAL"}
 };
 
-ros::Publisher tool_position_pub ;
-ros::Publisher joint_position_pub ;
-ros::Publisher robot_state_pub;
+rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub;
+rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub ;
+rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_state_pub;
 
-bool linear_move_callback(jaka_msgs::Move::Request &request,
-                         jaka_msgs::Move::Response &response)
+bool linear_move_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
+                         std::shared_ptr<jaka_msgs::srv::Move::Response> response)
 {
     CartesianPose end_pose;
-    double speed = (double)request.mvvelo;
-    double accel = (double)request.mvacc;
+    double speed = (double)request->mvvelo;
+    double accel = (double)request->mvacc;
     double tol = 0.5;
     Rpy rpy;
     OptionalCond *option_cond = nullptr;
-    end_pose.tran.x = request.pose[0];
-    end_pose.tran.y = request.pose[1];
-    end_pose.tran.z = request.pose[2];
-    Eigen::Vector3d Angaxis = {request.pose[3],request.pose[4],request.pose[5]};
+    end_pose.tran.x = request->pose[0];
+    end_pose.tran.y = request->pose[1];
+    end_pose.tran.z = request->pose[2];
+    Eigen::Vector3d Angaxis = {request->pose[3],request->pose[4],request->pose[5]};
     RotMatrix Rot = Angaxis2Rot(Angaxis);
     robot.rot_matrix_to_rpy(&Rot, &(end_pose.rpy));
     
@@ -94,12 +94,12 @@ bool linear_move_callback(jaka_msgs::Move::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "linear_move has been executed";
+            response->ret = 1;
+            response->message = "linear_move has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
 
@@ -107,18 +107,18 @@ bool linear_move_callback(jaka_msgs::Move::Request &request,
 
 }
 
-bool joint_move_callback(jaka_msgs::Move::Request &request,
-                        jaka_msgs::Move::Response &response)
+bool joint_move_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
+                         std::shared_ptr<jaka_msgs::srv::Move::Response> response)
 {
     JointValue joint_pose;
-    joint_pose.jVal[0] = request.pose[0];
-    joint_pose.jVal[1] = request.pose[1];
-    joint_pose.jVal[2] = request.pose[2];
-    joint_pose.jVal[3] = request.pose[3];
-    joint_pose.jVal[4] = request.pose[4]; 
-    joint_pose.jVal[5] = request.pose[5];
-    double speed = (double)request.mvvelo;
-    double accel = (double)request.mvacc;
+    joint_pose.jVal[0] = request->pose[0];
+    joint_pose.jVal[1] = request->pose[1];
+    joint_pose.jVal[2] = request->pose[2];
+    joint_pose.jVal[3] = request->pose[3];
+    joint_pose.jVal[4] = request->pose[4]; 
+    joint_pose.jVal[5] = request->pose[5];
+    double speed = (double)request->mvvelo;
+    double accel = (double)request->mvacc;
     double tol = 0.5;
     OptionalCond *option_cond = nullptr;
 
@@ -126,19 +126,19 @@ bool joint_move_callback(jaka_msgs::Move::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "joint_move has been executed";
+            response->ret = 1;
+            response->message = "joint_move has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
-bool jog_callback(jaka_msgs::Move::Request &request,
-        jaka_msgs::Move::Response &response)
+bool jog_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
+                std::shared_ptr<jaka_msgs::srv::Move::Response> response)
 {
     // 1. Initialization parameters
     double move_velocity = 0;
@@ -147,29 +147,29 @@ bool jog_callback(jaka_msgs::Move::Request &request,
     // 2. Select index   mapping the index and velocity
     //request.index 如果是关节空间   就是  0+,0-,1+,1-,2+,2-,3+,3-,4+,4-,5+,5-
     //request.index 如果是笛卡尔空间 就是x+,x-,y+,y-,z+,z-,rx+,rx-,ry+,ry-,rz+,rz-
-    float index_temp = static_cast<float>(request.index) / 2 + 0.1;
+    float index_temp = static_cast<float>(request->index) / 2 + 0.1;
     int index = static_cast<int>(index_temp);
     
     // 3. Select coordinates
-    switch (request.coord_mode)
+    switch (request->coord_mode)
     {
         case 0:
             //coordinate system of joints
             coord_type = COORD_JOINT; 
             //Joint Movement Velocity (rad/s)
-            move_velocity = request.mvacc;       
+            move_velocity = request->mvacc;       
             break;
         case 1:
             //Base coordinate system (Cartesian space)
             coord_type = COORD_BASE;
             //movement speed (mm/s)
-            move_velocity = request.mvacc;  
+            move_velocity = request->mvacc;  
             break;
         case 2:
             //Tool coordinate system (Cartesian space)
 		    coord_type = COORD_TOOL;
             //movement speed (mm/s)
-            move_velocity = request.mvacc;
+            move_velocity = request->mvacc;
             break; 
         default:
             ROS_INFO("Coordinate system input error, please re-enter");
@@ -177,12 +177,12 @@ bool jog_callback(jaka_msgs::Move::Request &request,
     }
     // 4. Determine the direction of velocity 
     //Determine whether robot motion (articulated or Cartesian) is in a positive or negative direction
-    if(request.index&1)
+    if(request->index&1)
     {
         move_velocity = -move_velocity;
     }
     //5. Conducting jogging
-    if (jog_index_last != request.index)
+    if (jog_index_last != request->index)
     {   
         int ret = robot.motion_abort();
         if (ret == 0)
@@ -191,104 +191,104 @@ bool jog_callback(jaka_msgs::Move::Request &request,
             switch(jog_state)
             {
                 case 0:
-                    response.ret = 1;
-                    response.message = "Position is reached";
+                    response->ret = 1;
+                    response->message = "Position is reached";
                     break;
                 default:
-                    response.ret = jog_state;
-                    response.message = "error occurred:" + mapErr[jog_state];
+                    response->ret = jog_state;
+                    response->message = "error occurred:" + mapErr[jog_state];
                     break;
             }
         }
         else
         {
-            response.ret = ret;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = ret;
+            response->message = "error occurred:" + mapErr[ret];
         }
-        jog_index_last = request.index;
+        jog_index_last = request->index;
     }
     else
     {
-        response.ret = 1;
-        response.message = "Robot is jogging";
+        response->ret = 1;
+        response->message = "Robot is jogging";
         ROS_INFO("Robot is jogging\n");
     }
     jog_count = jog_count + 1;
     return true;
 }
 
-bool servo_move_enable_callback(jaka_msgs::ServoMoveEnable::Request &request,
-                               jaka_msgs::ServoMoveEnable::Response &response)
+bool servo_move_enable_callback(const std::shared_ptr<jaka_msgs::srv::ServoMoveEnable::Request> request,
+                               std::shared_ptr<jaka_msgs::srv::ServoMoveEnable::Response> response)
 {
-    BOOL enable = request.enable;
+    BOOL enable = request->enable;
     int ret = robot.servo_move_enable(enable);
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "servo_move_enable has been executed";
+            response->ret = 1;
+            response->message = "servo_move_enable has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
-bool servo_p_callback(jaka_msgs::ServoMove::Request &request,
-                     jaka_msgs::ServoMove::Response &response)
+bool servo_p_callback(const std::shared_ptr<jaka_msgs::srv::ServoMove::Request> request,
+                    std::shared_ptr<jaka_msgs::srv::ServoMove::Response> response)
 {
     //speed * 0.008
     CartesianPose cartesian_pose;
-    cartesian_pose.tran.x = request.pose[0];
-    cartesian_pose.tran.y = request.pose[1];
-    cartesian_pose.tran.z = request.pose[2];
-    cartesian_pose.rpy.rx = request.pose[3];
-    cartesian_pose.rpy.ry = request.pose[4];
-    cartesian_pose.rpy.rz = request.pose[5];
+    cartesian_pose.tran.x = request->pose[0];
+    cartesian_pose.tran.y = request->pose[1];
+    cartesian_pose.tran.z = request->pose[2];
+    cartesian_pose.rpy.rx = request->pose[3];
+    cartesian_pose.rpy.ry = request->pose[4];
+    cartesian_pose.rpy.rz = request->pose[5];
     int ret = robot.servo_p(&cartesian_pose, MoveMode::INCR);
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "Servo_p has been executed";
+            response->ret = 1;
+            response->message = "Servo_p has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
-bool servo_j_callback(jaka_msgs::ServoMove::Request &request,
-                     jaka_msgs::ServoMove::Response &response)
+bool servo_j_callback(const std::shared_ptr<jaka_msgs::srv::ServoMove::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::ServoMove::Response> response)
 {
     JointValue joint_pose;
-    joint_pose.jVal[0] = request.pose[0];
-    joint_pose.jVal[1] = request.pose[1];
-    joint_pose.jVal[2] = request.pose[2];
-    joint_pose.jVal[3] = request.pose[3];
-    joint_pose.jVal[4] = request.pose[4];
-    joint_pose.jVal[5] = request.pose[5];
+    joint_pose.jVal[0] = request->pose[0];
+    joint_pose.jVal[1] = request->pose[1];
+    joint_pose.jVal[2] = request->pose[2];
+    joint_pose.jVal[3] = request->pose[3];
+    joint_pose.jVal[4] = request->pose[4];
+    joint_pose.jVal[5] = request->pose[5];
     int ret = robot.servo_j(&joint_pose, MoveMode::INCR);
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "Servo_j has been executed";
+            response->ret = 1;
+            response->message = "Servo_j has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
-bool stop_move_callback(std_srvs::Empty::Request &request,
-                        std_srvs::Empty::Response &response)
+bool stop_move_callback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                        std::shared_ptr<std_srvs::srv::Empty::Response> response)
 {
     //Initialize jog related parameters
     jog_count = 0;
@@ -309,15 +309,15 @@ bool stop_move_callback(std_srvs::Empty::Request &request,
 }
 
 
-bool set_toolFrame_callback(jaka_msgs::SetTcpFrame::Request &request,
-                          jaka_msgs::SetTcpFrame::Response &response)
+bool set_toolFrame_callback(const std::shared_ptr<jaka_msgs::srv::SetTcpFrame::Request> request,
+                          std::shared_ptr<jaka_msgs::srv::SetTcpFrame::Response> response)
 {
     CartesianPose tool_frame;
-    int tool_frame_id = request.tool_num;
-    tool_frame.tran.x = request.pose[0];
-    tool_frame.tran.y = request.pose[1];
-    tool_frame.tran.z = request.pose[2];
-    Eigen::Vector3d Angaxis = {request.pose[3],request.pose[4],request.pose[5]};
+    int tool_frame_id = request->tool_num;
+    tool_frame.tran.x = request->pose[0];
+    tool_frame.tran.y = request->pose[1];
+    tool_frame.tran.z = request->pose[2];
+    Eigen::Vector3d Angaxis = {request->pose[3],request->pose[4],request->pose[5]};
     RotMatrix Rot = Angaxis2Rot(Angaxis);
     robot.rot_matrix_to_rpy(&Rot, &(tool_frame.rpy));
     // Eigen::AngleAxisd rotation_vector(Angaxis.norm(), Angaxis.normalized());
@@ -330,27 +330,27 @@ bool set_toolFrame_callback(jaka_msgs::SetTcpFrame::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "set_toolFrame has been executed";
+            response->ret = 1;
+            response->message = "set_toolFrame has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
 
-bool set_userFrame_callback(jaka_msgs::SetUserFrame::Request &request,
-                           jaka_msgs::SetUserFrame::Response &response)
+bool set_userFrame_callback(const std::shared_ptr<jaka_msgs::srv::SetUserFrame::Request> request,
+                           std::shared_ptr<jaka_msgs::srv::SetUserFrame::Response> response)
 {
     CartesianPose user_frame;
-    int user_frame_id = request.user_num; 
-    user_frame.tran.x = request.pose[0];
-    user_frame.tran.y = request.pose[1];
-    user_frame.tran.z = request.pose[2];
-    Eigen::Vector3d Angaxis = {request.pose[3],request.pose[4],request.pose[5]};
+    int user_frame_id = request->user_num; 
+    user_frame.tran.x = request->pose[0];
+    user_frame.tran.y = request->pose[1];
+    user_frame.tran.z = request->pose[2];
+    Eigen::Vector3d Angaxis = {request->pose[3],request->pose[4],request->pose[5]};
     RotMatrix Rot = Angaxis2Rot(Angaxis);
     robot.rot_matrix_to_rpy(&Rot, &(user_frame.rpy));
     // Eigen::AngleAxisd rotation_vector(Angaxis.norm(), Angaxis.normalized());
@@ -362,27 +362,27 @@ bool set_userFrame_callback(jaka_msgs::SetUserFrame::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "set_userFrame has been executed";
+            response->ret = 1;
+            response->message = "set_userFrame has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
-bool set_payload_callback(jaka_msgs::SetPayload::Request &request,
-                      jaka_msgs::SetPayload::Response &response)
+bool set_payload_callback(const std::shared_ptr<jaka_msgs::srv::SetPayload::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::SetPayload::Response> response)
 {
     PayLoad payload;
-    int tool_id = request.tool_num;
+    int tool_id = request->tool_num;
 
-    payload.centroid.x = request.xc;
-    payload.centroid.y = request.yc;
-    payload.centroid.z = request.zc;
-    payload.mass = request.mass;
+    payload.centroid.x = request->xc;
+    payload.centroid.y = request->yc;
+    payload.centroid.z = request->zc;
+    payload.mass = request->mass;
 
     robot.set_tool_id(tool_id);
     int ret = robot.set_payload(&payload);
@@ -390,31 +390,31 @@ bool set_payload_callback(jaka_msgs::SetPayload::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "set_payload has been executed";
+            response->ret = 1;
+            response->message = "set_payload has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
 
     return true;
 }
 
-bool drag_mode_callback(std_srvs::SetBool::Request &request,
-                        std_srvs::SetBool::Response &response)
+bool drag_mode_callback(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                        std::shared_ptr<std_srvs::srv::SetBool::Response> response)
 {
-    int ret = robot.drag_mode_enable(request.data);
+    int ret = robot.drag_mode_enable(request->data);
     switch(ret)
     {
         case 0:
-            response.success = 1;
-            response.message = "drag_mode has been executed";
+            response->success = 1;
+            response->message = "drag_mode has been executed";
             break;
         default:
-            response.success = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->success = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
 
@@ -422,29 +422,29 @@ bool drag_mode_callback(std_srvs::SetBool::Request &request,
 
 }
 
-bool set_collisionLevel_callback(jaka_msgs::SetCollision::Request &request,
-                           jaka_msgs::SetCollision::Response &response)
+bool set_collisionLevel_callback(const std::shared_ptr<jaka_msgs::srv::SetCollision::Request> request,
+                           std::shared_ptr<jaka_msgs::srv::SetCollision::Response> response)
 {
     int collision_level;
-    if(request.is_enable = 0)
+    if(request->is_enable = 0)
     {
         collision_level = 0;
     }
     else
     {
-        if(request.value <= 25)
+        if(request->value <= 25)
         {
             collision_level = 1;
         }
-        else if(request.value <= 50)
+        else if(request->value <= 50)
         {
             collision_level = 2;
         }
-        else if(request.value <= 75)
+        else if(request->value <= 75)
         {
             collision_level = 3;
         }
-        else if(request.value <=100)
+        else if(request->value <=100)
         {
             collision_level = 4;
         }
@@ -457,12 +457,12 @@ bool set_collisionLevel_callback(jaka_msgs::SetCollision::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "Collision level" + to_string(collision_level) + " has been executed";
+            response->ret = 1;
+            response->message = "Collision level" + to_string(collision_level) + " has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
 
     }
@@ -470,12 +470,12 @@ bool set_collisionLevel_callback(jaka_msgs::SetCollision::Request &request,
 }
 
 
-bool set_io_callback(jaka_msgs::SetIO::Request &request,
-                     jaka_msgs::SetIO::Response &response)
+bool set_io_callback(const std::shared_ptr<jaka_msgs::srv::SetIO::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::SetIO::Response> response)
 {   
     IOType type;
     int ret;
-    switch(request.type)
+    switch(request->type)
     {
         case 0:
             type = IO_CABINET;
@@ -487,9 +487,9 @@ bool set_io_callback(jaka_msgs::SetIO::Request &request,
             type = IO_EXTEND;
             break;
     }
-    float value = request.value;
-    string signal = request.signal;
-    int index = request.index;
+    float value = request->value;
+    string signal = request->signal;
+    int index = request->index;
     if(signal == "digital")
     {      
         BOOL digital_value;
@@ -510,27 +510,26 @@ bool set_io_callback(jaka_msgs::SetIO::Request &request,
     switch(ret)
     {
         case 0:
-            response.ret = 1;
-            response.message = "set IO has been executed";
+            response->ret = 1;
+            response->message = "set IO has been executed";
             break;
         default:
-            response.ret = 0;
-            response.message = "error occurred:" + mapErr[ret];
+            response->ret = 0;
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 }
 
 
-
-bool get_io_callback(jaka_msgs::GetIO::Request &request,
-                     jaka_msgs::GetIO::Response &response)
+bool get_io_callback(const std::shared_ptr<jaka_msgs::srv::GetIO::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::GetIO::Response> response)
 {   
     IOType type;
     int ret;
     BOOL digital_result;
     float analog_result;
-    switch(request.type)
+    switch(request->type)
     {
         case 0:
             type = IO_CABINET;
@@ -542,9 +541,9 @@ bool get_io_callback(jaka_msgs::GetIO::Request &request,
             type = IO_EXTEND;
             break;
     }
-    string signal = request.signal;
-    int index = request.index;
-    int path = request.path;
+    string signal = request->signal;
+    int index = request->index;
+    int path = request->path;
     if(signal == "digital")
     {       
         if(path == 0)
@@ -558,12 +557,12 @@ bool get_io_callback(jaka_msgs::GetIO::Request &request,
         switch(ret)
         {
             case 0:
-                response.value = float(digital_result);
-                response.message = "get IO has been executed";
+                response->value = float(digital_result);
+                response->message = "get IO has been executed";
                 break;
             default:
-                response.value = -999999;
-                response.message = "error occurred:" + mapErr[ret];
+                response->value = -999999;
+                response->message = "error occurred:" + mapErr[ret];
         }
         return true;
     }
@@ -580,12 +579,12 @@ bool get_io_callback(jaka_msgs::GetIO::Request &request,
         switch(ret)
         {
             case 0:
-                response.value = analog_result;
-                response.message = "get IO has been executed";
+                response->value = analog_result;
+                response->message = "get IO has been executed";
                 break;
             default:
-                response.value = -999999;
-                response.message = "error occurred:" + mapErr[ret];
+                response->value = -999999;
+                response->message = "error occurred:" + mapErr[ret];
 
         }
     return true;
@@ -593,74 +592,74 @@ bool get_io_callback(jaka_msgs::GetIO::Request &request,
     
 }
 
-bool get_fk_callback(jaka_msgs::GetFK::Request &request,
-                     jaka_msgs::GetFK::Response &response)
+bool get_fk_callback(const std::shared_ptr<jaka_msgs::srv::GetFK::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::GetFK::Response> response)
 {
     JointValue joint_pose;
     CartesianPose cartesian_pose;
     for(int i = 0; i < 6; i++)
     {
-        joint_pose.jVal[i] = request.joint[i];
+        joint_pose.jVal[i] = request->joint[i];
     }
     int ret = robot.kine_forward(&joint_pose, &cartesian_pose);
     switch(ret)
     {
         case 0:
-            response.cartesian_pose.push_back(cartesian_pose.tran.x);
-            response.cartesian_pose.push_back(cartesian_pose.tran.y);
-            response.cartesian_pose.push_back(cartesian_pose.tran.z);
-            response.cartesian_pose.push_back(cartesian_pose.rpy.rx);
-            response.cartesian_pose.push_back(cartesian_pose.rpy.ry);
-            response.cartesian_pose.push_back(cartesian_pose.rpy.rz);
-            response.message = "get FK has been executed";
+            response->cartesian_pose.push_back(cartesian_pose.tran.x);
+            response->cartesian_pose.push_back(cartesian_pose.tran.y);
+            response->cartesian_pose.push_back(cartesian_pose.tran.z);
+            response->cartesian_pose.push_back(cartesian_pose.rpy.rx);
+            response->cartesian_pose.push_back(cartesian_pose.rpy.ry);
+            response->cartesian_pose.push_back(cartesian_pose.rpy.rz);
+            response->message = "get FK has been executed";
             break;
         default:
             float pose_init[6] = {9999.0, 9999.0, 9999.0, 9999.0, 9999.0, 9999.0};
             for(int i = 0; i < 6; i++)
             {
-                response.cartesian_pose.push_back(pose_init[i]);
+                response->cartesian_pose.push_back(pose_init[i]);
             }
-            response.message = "error occurred:" + mapErr[ret];
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
 
 }
 
-bool get_ik_callback(jaka_msgs::GetIK::Request &request,
-                     jaka_msgs::GetIK::Response &response)
+bool get_ik_callback(const std::shared_ptr<jaka_msgs::srv::GetIK::Request> request,
+                     std::shared_ptr<jaka_msgs::srv::GetIK::Response> response)
 {
     JointValue joint_pose;
     JointValue ref_joint;
     CartesianPose cartesian_pose;
     for(int i = 0; i < 6; i++)
     {
-        ref_joint.jVal[i] = request.ref_joint[i];
+        ref_joint.jVal[i] = request->ref_joint[i];
 
     }
-    cartesian_pose.tran.x = request.cartesian_pose[0];
-    cartesian_pose.tran.y = request.cartesian_pose[1];
-    cartesian_pose.tran.z = request.cartesian_pose[2];
-    cartesian_pose.rpy.rx = request.cartesian_pose[3];
-    cartesian_pose.rpy.ry = request.cartesian_pose[4];
-    cartesian_pose.rpy.rz = request.cartesian_pose[5];
+    cartesian_pose.tran.x = request->cartesian_pose[0];
+    cartesian_pose.tran.y = request->cartesian_pose[1];
+    cartesian_pose.tran.z = request->cartesian_pose[2];
+    cartesian_pose.rpy.rx = request->cartesian_pose[3];
+    cartesian_pose.rpy.ry = request->cartesian_pose[4];
+    cartesian_pose.rpy.rz = request->cartesian_pose[5];
     int ret = robot.kine_inverse(&ref_joint, &cartesian_pose, &joint_pose);
     switch(ret)
     {
         case 0:
             for(int i = 0; i < 6; i++)
             {
-                response.joint.push_back(joint_pose.jVal[i]);
+                response->joint.push_back(joint_pose.jVal[i]);
             }
-            response.message = "get IK has been executed";
+            response->message = "get IK has been executed";
             break;
         default:
             float joint_init[6] = {9999.0, 9999.0, 9999.0, 9999.0, 9999.0, 9999.0};
             for(int i = 0; i < 6; i++)
             {
-                response.joint.push_back(joint_init[i]);
+                response->joint.push_back(joint_init[i]);
             }
-            response.message = "error occurred:" + mapErr[ret];
+            response->message = "error occurred:" + mapErr[ret];
             return false;
     }
     return true;
@@ -677,9 +676,10 @@ bool clear_error_callback(jaka_msgs::ClearError::Request &request,
 }
 */
 
-void tool_position_callback(ros::Publisher tool_position_pub)
+void tool_position_callback(//ros::Publisher tool_position_pub
+rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub)
 {
-    geometry_msgs::TwistStamped  tool_position;
+    geometry_msgs::msg::TwistStamped  tool_position;
     RobotStatus robotstatus;
     RotMatrix rot;
     Rpy rpy;
@@ -714,13 +714,14 @@ void tool_position_callback(ros::Publisher tool_position_pub)
     // tool_position.twist.angular.y = v[1];
     // tool_position.twist.angular.z = v[2];
     
-    tool_position.header.stamp = ros::Time::now();
-    tool_position_pub.publish(tool_position);
+    tool_position.header.stamp = rclcpp::Clock().now();
+    tool_position_pub->publish(tool_position);
 }
 
-void joint_position_callback(ros::Publisher joint_position_pub)
+void joint_position_callback(//ros::Publisher joint_position_pub
+rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub)
 {
-    sensor_msgs::JointState joint_position;
+    sensor_msgs::msg::JointState joint_position;
     RobotStatus robotstatus;
     robot.get_robot_status(&robotstatus);
     for (int i = 0; i < 6; i++)
@@ -729,12 +730,13 @@ void joint_position_callback(ros::Publisher joint_position_pub)
         int j = i + 1;
         joint_position.name.push_back("joint_" + to_string(j));
     }
-    joint_position.header.stamp = ros::Time::now();
-    joint_position_pub.publish(joint_position);
+    joint_position.header.stamp = rclcpp::Clock().now();
+    joint_position_pub->publish(joint_position);
 }
-void robot_states_callback(ros::Publisher robot_states_pub)
+void robot_states_callback(//ros::Publisher robot_states_pub
+rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_states_pub)
 {
-    jaka_msgs::RobotMsg robot_states;
+    jaka_msgs::msg::RobotMsg robot_states;
     RobotStatus robotstatus;
     ProgramState programstate;
     BOOL in_pos = true;
@@ -792,7 +794,7 @@ void robot_states_callback(ros::Publisher robot_states_pub)
     {
         robot_states.collision_state = 0;
     }
-    robot_states_pub.publish(robot_states);
+    robot_states_pub->publish(robot_states);
 }
 
 void stop_jog_callback(const ros::TimerEvent &event)
@@ -812,7 +814,7 @@ void stop_jog_callback(const ros::TimerEvent &event)
 void* get_conn_scoket_state(void* args){
     RobotStatus robot_status;
 	
-    while (ros::ok())
+    while (rclcpp::ok())
     {
         int ret = robot.get_robot_status(&robot_status);
 		if (ret)
@@ -836,56 +838,54 @@ void* get_conn_scoket_state(void* args){
 
 int main(int argc, char *argv[])
 {
-
-    setlocale(LC_ALL, "");
-    ros::init(argc, argv, "jaka_driver");
-    ros::NodeHandle nh;
-    ros::Rate rate(125);
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("jaka_driver");
+    rclcpp::Rate rate(125);
     // robot.login_in(argv[1]);
     string default_ip = "10.5.5.100";
-    string robot_ip = nh.param("ip", default_ip);
+    string robot_ip = node->get_parameter("ip", default_ip).as_string();
     robot.login_in(robot_ip.c_str());
     robot.set_status_data_update_time_interval(100);
     robot.set_block_wait_timeout(120);
     robot.power_on();
-    sleep(1);
+    rclcpp::sleep_for(std::chrono::milliseconds(1000));
     robot.enable_robot();
     //Joint-space first-order low-pass filtering in robot servo mode
     //robot.servo_move_use_joint_LPF(2);
     robot.servo_speed_foresight(15,0.03);
 
     //1.1 Linear motion (in customized user coordinate system)
-    ros::ServiceServer linear_move_service = nh.advertiseService("/jaka_driver/linear_move", linear_move_callback);
+    auto linear_move_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback);  //话题名
     //1.2 Joint motion
-    ros::ServiceServer joint_move_service = nh.advertiseService("/jaka_driver/joint_move", joint_move_callback);
+    auto joint_move_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/joint_move", &joint_move_callback);
     //1.3 Jog motion
-    ros::ServiceServer jog_service = nh.advertiseService("/jaka_driver/jog", jog_callback);
+    auto jog_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/jog", &jog_callback);
     //1.4 Servo Position Control Mode Enable
-    ros::ServiceServer servo_move_enable_service = nh.advertiseService("/jaka_driver/servo_move_enable", servo_move_enable_callback);
+    auto servo_move_enable_service = node->create_service<jaka_msgs::srv::ServoMoveEnable>("/jaka_driver/servo_move_enable", &servo_move_enable_callback);
     //1.5 Servo-mode motion in Cartesian space
-    ros::ServiceServer servo_p_service = nh.advertiseService("/jaka_driver/servo_p", servo_p_callback);
+    auto servo_p_service = node->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_p", &servo_p_callback);
     //1.6 Joint space servo mode motion
-    ros::ServiceServer servo_j_service = nh.advertiseService("/jaka_driver/servo_j", servo_j_callback);
+    auto servo_j_service = node->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_j", &servo_j_callback);
     //1.7 stop motion
-    ros::ServiceServer stop_move_service = nh.advertiseService("/jaka_driver/stop_move",stop_move_callback);
+    auto stop_move_service = node->create_service<std_srvs::srv::Empty>("/jaka_driver/stop_move", &stop_move_callback);
     //2.1 Setting tcp parameters
-    ros::ServiceServer set_toolframe_service = nh.advertiseService("/jaka_driver/set_toolframe", set_toolFrame_callback);
+    auto set_toolframe_service = node->create_service<jaka_msgs::srv::SetTcpFrame>("/jaka_driver/set_toolframe", &set_toolFrame_callback);
     //2.2 Setting user coordinate system parameters
-    ros::ServiceServer set_userframe_service = nh.advertiseService("/jaka_driver/set_userframe", set_userFrame_callback);
+    auto set_userframe_service = node->create_service<jaka_msgs::srv::SetUserFrame>("/jaka_driver/set_userframe", &set_userFrame_callback);
     //2.3 Set the center of gravity parameters of the robot arm load
-    ros::ServiceServer set_payload_service = nh.advertiseService("/jaka_driver/set_payload", set_payload_callback);
+    auto set_payload_service = node->create_service<jaka_msgs::srv::SetPayload>("/jaka_driver/set_payload", &set_payload_callback);
     //2.4 Set free drive mode
-    ros::ServiceServer drag_move_service = nh.advertiseService("/jaka_driver/drag_move", drag_mode_callback);
+    auto drag_move_service = node->create_service<std_srvs::srv::SetBool>("/jaka_driver/drag_move", &drag_mode_callback);
     //2.5 Set collision sensitivity
-    ros::ServiceServer set_collisionlevel_service = nh.advertiseService("/jaka_driver/set_collisionlevel", set_collisionLevel_callback);
+    auto set_collisionlevel_service = node->create_service<jaka_msgs::srv::SetCollision>("/jaka_driver/set_collisionlevel", &set_collisionLevel_callback);
     //2.6 Set IO
-    ros::ServiceServer set_io_service = nh.advertiseService("jaka_driver/set_io",set_io_callback);
+    auto set_io_service = node->create_service<jaka_msgs::srv::SetIO>("/jaka_driver/set_io", &set_io_callback);
     //2.7 Get IO
-    ros::ServiceServer get_io_service = nh.advertiseService("jaka_driver/get_io",get_io_callback);
+    auto get_io_service = node->create_service<jaka_msgs::srv::GetIO>("/jaka_driver/get_io", &get_io_callback);
     //2.8 Find the positive solution
-    ros::ServiceServer get_fk_service = nh.advertiseService("jaka_driver/get_fk", get_fk_callback);
+    auto get_fk_service = node->create_service<jaka_msgs::srv::GetFK>("/jaka_driver/get_fk", &get_fk_callback)
     //2.9 Find the inverse solution
-    ros::ServiceServer get_ik_service = nh.advertiseService("jaka_driver/get_ik", get_ik_callback);
+    auto get_ik_service = node->create_service<jaka_msgs::srv::GetIK>("/jaka_driver/get_ik", &get_ik_callback);
     //3.1 End position pose status information reporting
     //ros::Publisher tool_position_pub = nh.advertise<geometry_msgs::TwistStamped>("/jaka_driver/tool_position", 10);
     //3.2 Joint status information reporting
@@ -906,16 +906,18 @@ int main(int argc, char *argv[])
     pthread_t conn_state_thread;
     int ret = pthread_create(&conn_state_thread,NULL,get_conn_scoket_state,NULL);
 
-    ROS_INFO("start");
+    RCLCPP_INFO(rclcpp::get_logger("jaka_driver"), "start");
     
-    while(ros::ok())
+    while(rclcpp::ok())
     {   
         // tool_position_callback(tool_position_pub);
         // joint_position_callback(joint_position_pub);
         // robot_states_callback(robot_state_pub);
         rate.sleep();
-        ros::spinOnce();
+        rclcpp::spin_some();
     }
-    ros::spin();
+    
+    rclcpp::spin(node);
+    rclcpp::shutdown();
     return 0;
 }

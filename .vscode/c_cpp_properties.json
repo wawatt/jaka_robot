@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                // "${workspaceFolder}/**",
+                "E:/ENVs/ros_env/Library/include/**",
+                "${workspaceFolder}/jaka_robot_v2.2/install/include/**",
+                "${workspaceFolder}/jaka_robot_v2.2/src/jaka_driver/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.22621.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}

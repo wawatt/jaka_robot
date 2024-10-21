@@ -1,6 +1,6 @@
 	/**
 	* @last update Nov 30 2021 
-	* @sdkversion 2.1.2.3_dev
+	* @sdkversion 2.1.11
 	* @Maintenance star@jaka
 	*/
 #ifndef _JHTYPES_H_
@@ -126,6 +126,25 @@ typedef struct
 {
 	double jVal[6]; ///< 6关节位置值，单位：rad
 } JointValue;
+
+/**
+* @brief collision option
+*/
+typedef struct{
+	int collisionMethod;
+	int reactionType;
+	float reboundAngle;
+}CollisionOption;
+
+/**
+* @brief collision option setting type
+*/
+typedef enum {
+	CollitionOption_ALL,
+	CollitionOption_Method,
+	CollitionOption_ReactionType,
+	CollitionOption_ReboundAngle
+}CollisionOptionSettingType;
 
 /**
 * @brief IO类型枚举
