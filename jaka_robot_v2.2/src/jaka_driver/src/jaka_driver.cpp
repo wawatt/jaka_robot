@@ -38,6 +38,9 @@
 #include <chrono>
 #include <thread>
 using namespace std;
+using namespace std::chrono_literals;
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("jaka_driver");
 
 const double PI = 3.1415926;
 //Define variable: the direction that was sent down the last time the jog was called
@@ -48,7 +51,7 @@ int jog_count = 0;
 int jog_count_temp = 0;
 JAKAZuRobot robot;
 //SDK interface return status
-map<int, string>mapErr = {
+std::map<int, string>mapErr = {
     {2,"ERR_FUCTION_CALL_ERROR"},
     {-1,"ERR_INVALID_HANDLER"},
     {-2,"ERR_INVALID_PARAMETER"},
@@ -63,10 +66,6 @@ map<int, string>mapErr = {
     {-11,"ERR_CANNOT_OPEN_FILE"},
     {-12,"ERR_MOTION_ABNORMAL"}
 };
-
-rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub;
-rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub ;
-rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_state_pub;
 
 bool linear_move_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
                          std::shared_ptr<jaka_msgs::srv::Move::Response> response)
@@ -172,7 +171,7 @@ bool jog_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
             move_velocity = request->mvacc;
             break; 
         default:
-            ROS_INFO("Coordinate system input error, please re-enter");
+            RCLCPP_INFO(LOGGER, "Coordinate system input error, please re-enter");
             return true;
     }
     // 4. Determine the direction of velocity 
@@ -211,7 +210,7 @@ bool jog_callback(const std::shared_ptr<jaka_msgs::srv::Move::Request> request,
     {
         response->ret = 1;
         response->message = "Robot is jogging";
-        ROS_INFO("Robot is jogging\n");
+        RCLCPP_INFO(LOGGER, "Robot is jogging\n");
     }
     jog_count = jog_count + 1;
     return true;
@@ -298,11 +297,11 @@ bool stop_move_callback(const std::shared_ptr<std_srvs::srv::Empty::Request> req
     switch(ret)
     {
         case 0:
-            ROS_INFO("stop_move has been executed");
+            RCLCPP_INFO(LOGGER, "stop_move has been executed");
 
             break;
         default:
-            ROS_INFO("error occurred: %s", mapErr[ret].c_str());
+            RCLCPP_INFO(LOGGER, "error occurred: %s", mapErr[ret].c_str());
             return false;;
     }
     return true;
@@ -676,248 +675,269 @@ bool clear_error_callback(jaka_msgs::ClearError::Request &request,
 }
 */
 
-void tool_position_callback(//ros::Publisher tool_position_pub
-rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub)
-{
-    geometry_msgs::msg::TwistStamped  tool_position;
-    RobotStatus robotstatus;
-    RotMatrix rot;
-    Rpy rpy;
-    robot.get_robot_status(&robotstatus);
-    tool_position.twist.linear.x = robotstatus.cartesiantran_position[0];
-    tool_position.twist.linear.y = robotstatus.cartesiantran_position[1];
-    tool_position.twist.linear.z = robotstatus.cartesiantran_position[2];
-    rpy.rx = robotstatus.cartesiantran_position[3];
-    rpy.ry = robotstatus.cartesiantran_position[4];
-    rpy.rz = robotstatus.cartesiantran_position[5];
-    robot.rpy_to_rot_matrix(&rpy, &rot);
-    // Eigen::Vector3d angaxis = Rot2Angaxis(rot);
-    // tool_position.twist.angular.x = angaxis[0];
-    // tool_position.twist.angular.y = angaxis[1];
-    // tool_position.twist.angular.z = angaxis[2];
-    tool_position.twist.angular.x = (rpy.rx )/PI*180;
-    tool_position.twist.angular.y = (rpy.ry )/PI*180;
-    tool_position.twist.angular.z = (rpy.rz )/PI*180;
 
-    // Eigen::Vector3d eulerAngle(rpy.rx,rpy.ry,rpy.rz);
-    // Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitX()));
-    // Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1),Eigen::Vector3d::UnitY()));
-    // Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitZ()));
-    // Eigen::AngleAxisd rotation_vector;
-    // rotation_vector=yawAngle*pitchAngle*rollAngle;
-    // cout << "angle is: " << rotation_vector.angle() << endl;
-    // cout << "axis is: " << rotation_vector.axis() << endl;
-    // double angle = rotation_vector.angle();
-    // Eigen::Vector3d axis = rotation_vector.axis();
-    // Eigen::Vector3d v = angle * axis;
-    // tool_position.twist.angular.x = v[0];
-    // tool_position.twist.angular.y = v[1];
-    // tool_position.twist.angular.z = v[2];
+class JakaDriver : public rclcpp::Node
+{
+public: 
+    JakaDriver() : Node("jaka_driver")
+    {
+
+        // rclcpp::Rate rate(125);
+        string default_ip = "10.5.5.100";
+        string robot_ip;
+        this->declare_parameter<std::string>("ip", default_ip);
+        if (!this->get_parameter<std::string>("ip", robot_ip))
+        // if (this->get_parameter("ip", robot_ip).as_string().empty())
+        {
+            robot_ip = default_ip;
+            RCLCPP_ERROR(LOGGER, "parameter ip not set, using default: %s", robot_ip.c_str());
+        }
+        RCLCPP_INFO(LOGGER, "robot_ip: %s", robot_ip.c_str());
+        if(robot.login_in(robot_ip.c_str())!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "login_in failed");
+        }
+        robot.set_status_data_update_time_interval(100);
+        robot.set_block_wait_timeout(120);
+        robot.power_on();
+        rclcpp::sleep_for(std::chrono::milliseconds(1000));
+        robot.enable_robot();
+        //Joint-space first-order low-pass filtering in robot servo mode
+        //robot.servo_move_use_joint_LPF(2);
+        robot.servo_speed_foresight(15,0.03);
     
-    tool_position.header.stamp = rclcpp::Clock().now();
-    tool_position_pub->publish(tool_position);
-}
-
-void joint_position_callback(//ros::Publisher joint_position_pub
-rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub)
-{
-    sensor_msgs::msg::JointState joint_position;
-    RobotStatus robotstatus;
-    robot.get_robot_status(&robotstatus);
-    for (int i = 0; i < 6; i++)
-    {
-        joint_position.position.push_back(robotstatus.joint_position[i]);
-        int j = i + 1;
-        joint_position.name.push_back("joint_" + to_string(j));
-    }
-    joint_position.header.stamp = rclcpp::Clock().now();
-    joint_position_pub->publish(joint_position);
-}
-void robot_states_callback(//ros::Publisher robot_states_pub
-rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_states_pub)
-{
-    jaka_msgs::msg::RobotMsg robot_states;
-    RobotStatus robotstatus;
-    ProgramState programstate;
-    BOOL in_pos = true;
-    BOOL in_col = false;
-    robot.is_in_pos(&in_pos);
-    robot.is_in_collision(&in_col);
-    robot.get_robot_status(&robotstatus);
-    robot.get_program_state(&programstate);
-
-    if(robotstatus.emergency_stop)
-    {
-        robot_states.motion_state = 2;
-    }
-    else if(robotstatus.errcode)
-    {
-        robot_states.motion_state = 4;
-    }
-    else if(in_pos && programstate == PROGRAM_IDLE && (!robotstatus.drag_status))
-    {
-        robot_states.motion_state = 0;
-    }
-    else if(programstate == PROGRAM_PAUSED)
-    {
-        robot_states.motion_state = 1;
-    }
-    else if((!in_pos) || programstate == PROGRAM_RUNNING || robotstatus.drag_status)
-    {
-        robot_states.motion_state = 3;
-    }
-
-    if(robotstatus.powered_on)
-    {
-        robot_states.power_state = 1;
- 
-    }
-    else
-    {
-        robot_states.power_state = 0;
-    }
-
-    if(robotstatus.enabled)
-    {
-        robot_states.servo_state = 1;
-    }
-    else
-    {
-        robot_states.servo_state = 0;
-    }
-
-    if(in_col)
-    {
-        robot_states.collision_state = 1;
-    }
-    else
-    {
-        robot_states.collision_state = 0;
-    }
-    robot_states_pub->publish(robot_states);
-}
-
-void stop_jog_callback(const ros::TimerEvent &event)
-{
-     if (jog_count >= 1 && jog_count_temp == jog_count )
-    {
-        robot.jog_stop(-1);
-        jog_count = 0;
-        jog_count_temp = 0;
-        jog_index_last = -1;
-        ROS_INFO("jog stop");
+        //1.1 Linear motion (in customized user coordinate system)
+        // auto linear_move_service = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback);
+        linear_move_service_ = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback); 
+        //1.2 Joint motion
+        joint_move_service_ = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/joint_move", &joint_move_callback);
+        //1.3 Jog motion
+        jog_service_ = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/jog", &jog_callback);
+        //1.4 Servo Position Control Mode Enable
+        auto servo_move_enable_service = this->create_service<jaka_msgs::srv::ServoMoveEnable>("/jaka_driver/servo_move_enable", &servo_move_enable_callback);
+        //1.5 Servo-mode motion in Cartesian space
+        auto servo_p_service = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_p", &servo_p_callback);
+        //1.6 Joint space servo mode motion
+        auto servo_j_service = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_j", &servo_j_callback);
+        //1.7 stop motion
+        auto stop_move_service = this->create_service<std_srvs::srv::Empty>("/jaka_driver/stop_move", &stop_move_callback);
+        //2.1 Setting tcp parameters
+        auto set_toolframe_service = this->create_service<jaka_msgs::srv::SetTcpFrame>("/jaka_driver/set_toolframe", &set_toolFrame_callback);
+        //2.2 Setting user coordinate system parameters
+        auto set_userframe_service = this->create_service<jaka_msgs::srv::SetUserFrame>("/jaka_driver/set_userframe", &set_userFrame_callback);
+        //2.3 Set the center of gravity parameters of the robot arm load
+        auto set_payload_service = this->create_service<jaka_msgs::srv::SetPayload>("/jaka_driver/set_payload", &set_payload_callback);
+        //2.4 Set free drive mode
+        auto drag_move_service = this->create_service<std_srvs::srv::SetBool>("/jaka_driver/drag_move", &drag_mode_callback);
+        //2.5 Set collision sensitivity
+        auto set_collisionlevel_service = this->create_service<jaka_msgs::srv::SetCollision>("/jaka_driver/set_collisionlevel", &set_collisionLevel_callback);
+        //2.6 Set IO
+        auto set_io_service = this->create_service<jaka_msgs::srv::SetIO>("/jaka_driver/set_io", &set_io_callback);
+        //2.7 Get IO
+        auto get_io_service = this->create_service<jaka_msgs::srv::GetIO>("/jaka_driver/get_io", &get_io_callback);
+        //2.8 Find the positive solution
+        auto get_fk_service = this->create_service<jaka_msgs::srv::GetFK>("/jaka_driver/get_fk", &get_fk_callback);
+        //2.9 Find the inverse solution
+        auto get_ik_service = this->create_service<jaka_msgs::srv::GetIK>("/jaka_driver/get_ik", &get_ik_callback);
+        //3.1 End position pose status information reporting
+        //ros::Publisher tool_position_pub = nh.advertise<geometry_msgs::TwistStamped>("/jaka_driver/tool_position", 10);
+        //3.2 Joint status information reporting
+        //ros::Publisher joint_position_pub = nh.advertise<sensor_msgs::JointState>("/jaka_driver/joint_position", 10);
+        //3.3 Report robot event status information
+        // ros::Publisher robot_state_pub = nh.advertise<jaka_msgs::RobotMsg>("/jaka_driver/robot_states", 10);
         
-    }
-    jog_count_temp = jog_count;
-}
+        RCLCPP_INFO(LOGGER, "service created");
+        //3.1 End position pose status information reporting
+        tool_position_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/jaka_driver/tool_position", 10);
+        //3.2 Joint status information reporting
+        joint_position_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("/jaka_driver/joint_position", 10);
+        //3.3 Report robot event status information
+        robot_state_pub_ = this->create_publisher<jaka_msgs::msg::RobotMsg>("/jaka_driver/robot_states", 10);
 
-void* get_conn_scoket_state(void* args){
-    RobotStatus robot_status;
-	
-    while (rclcpp::ok())
-    {
-        int ret = robot.get_robot_status(&robot_status);
-		if (ret)
-        {
-            ROS_ERROR("get_robot_status error!!!");
-        }
-        else if(!robot_status.is_socket_connect)
-		{
-            ROS_ERROR("connect error!!!");
-        }
-        if(ret==0)
-        {
-            tool_position_callback(tool_position_pub);
-            joint_position_callback(joint_position_pub);
-            robot_states_callback(robot_state_pub);
+        auto conn_state_timer = this->create_wall_timer(100ms, std::bind(&JakaDriver::get_conn_scoket_state, this));
         
+        auto stop_jog = this->create_wall_timer(3000ms,  std::bind(&JakaDriver::stop_jog_callback, this));
+    }
+    
+private:
+
+    void tool_position_callback()
+    {
+        geometry_msgs::msg::TwistStamped  tool_position;
+        RobotStatus robotstatus;
+        RotMatrix rot;
+        Rpy rpy;
+        robot.get_robot_status(&robotstatus);
+        tool_position.twist.linear.x = robotstatus.cartesiantran_position[0];
+        tool_position.twist.linear.y = robotstatus.cartesiantran_position[1];
+        tool_position.twist.linear.z = robotstatus.cartesiantran_position[2];
+        rpy.rx = robotstatus.cartesiantran_position[3];
+        rpy.ry = robotstatus.cartesiantran_position[4];
+        rpy.rz = robotstatus.cartesiantran_position[5];
+        robot.rpy_to_rot_matrix(&rpy, &rot);
+        // Eigen::Vector3d angaxis = Rot2Angaxis(rot);
+        // tool_position.twist.angular.x = angaxis[0];
+        // tool_position.twist.angular.y = angaxis[1];
+        // tool_position.twist.angular.z = angaxis[2];
+        tool_position.twist.angular.x = (rpy.rx )/PI*180;
+        tool_position.twist.angular.y = (rpy.ry )/PI*180;
+        tool_position.twist.angular.z = (rpy.rz )/PI*180;
+
+        // Eigen::Vector3d eulerAngle(rpy.rx,rpy.ry,rpy.rz);
+        // Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitX()));
+        // Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1),Eigen::Vector3d::UnitY()));
+        // Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitZ()));
+        // Eigen::AngleAxisd rotation_vector;
+        // rotation_vector=yawAngle*pitchAngle*rollAngle;
+        // cout << "angle is: " << rotation_vector.angle() << endl;
+        // cout << "axis is: " << rotation_vector.axis() << endl;
+        // double angle = rotation_vector.angle();
+        // Eigen::Vector3d axis = rotation_vector.axis();
+        // Eigen::Vector3d v = angle * axis;
+        // tool_position.twist.angular.x = v[0];
+        // tool_position.twist.angular.y = v[1];
+        // tool_position.twist.angular.z = v[2];
+        
+        tool_position.header.stamp = rclcpp::Clock().now();
+        tool_position_pub_->publish(tool_position);
+    }
+    
+    void joint_position_callback()
+    {
+        sensor_msgs::msg::JointState joint_position;
+        RobotStatus robotstatus;
+        robot.get_robot_status(&robotstatus);
+        for (int i = 0; i < 6; i++)
+        {
+            joint_position.position.push_back(robotstatus.joint_position[i]);
+            int j = i + 1;
+            joint_position.name.push_back("joint_" + to_string(j));
         }
-        ros::Duration(0.1).sleep(); 
-    }    
-}
+        joint_position.header.stamp = rclcpp::Clock().now();
+        joint_position_pub_->publish(joint_position);
+    }
+    
+    void robot_states_callback()
+    {
+        jaka_msgs::msg::RobotMsg robot_states;
+        RobotStatus robotstatus;
+        ProgramState programstate;
+        BOOL in_pos = true;
+        BOOL in_col = false;
+        robot.is_in_pos(&in_pos);
+        robot.is_in_collision(&in_col);
+        robot.get_robot_status(&robotstatus);
+        robot.get_program_state(&programstate);
+
+        if(robotstatus.emergency_stop)
+        {
+            robot_states.motion_state = 2;
+        }
+        else if(robotstatus.errcode)
+        {
+            robot_states.motion_state = 4;
+        }
+        else if(in_pos && programstate == PROGRAM_IDLE && (!robotstatus.drag_status))
+        {
+            robot_states.motion_state = 0;
+        }
+        else if(programstate == PROGRAM_PAUSED)
+        {
+            robot_states.motion_state = 1;
+        }
+        else if((!in_pos) || programstate == PROGRAM_RUNNING || robotstatus.drag_status)
+        {
+            robot_states.motion_state = 3;
+        }
+
+        if(robotstatus.powered_on)
+        {
+            robot_states.power_state = 1;
+    
+        }
+        else
+        {
+            robot_states.power_state = 0;
+        }
+
+        if(robotstatus.enabled)
+        {
+            robot_states.servo_state = 1;
+        }
+        else
+        {
+            robot_states.servo_state = 0;
+        }
+
+        if(in_col)
+        {
+            robot_states.collision_state = 1;
+        }
+        else
+        {
+            robot_states.collision_state = 0;
+        }
+        robot_state_pub_->publish(robot_states);
+    }
+
+    void get_conn_scoket_state()
+    {
+        RobotStatus robot_status;
+        
+        while (rclcpp::ok())
+        {
+            int ret = robot.get_robot_status(&robot_status);
+            if (ret)
+            {
+                RCLCPP_ERROR(LOGGER, "get_robot_status error!!!");
+            }
+            else if(!robot_status.is_socket_connect)
+            {
+                RCLCPP_ERROR(LOGGER, "connect error!!!");
+            }
+            if(ret==0)
+            {
+                tool_position_callback();
+                joint_position_callback();
+                robot_states_callback();
+            
+            }
+            rclcpp::sleep_for(std::chrono::milliseconds(100));
+        }    
+    }
+
+    void stop_jog_callback()
+    {
+        if (jog_count >= 1 && jog_count_temp == jog_count)
+        {
+            robot.jog_stop(-1);
+            jog_count = 0;
+            jog_count_temp = 0;
+            jog_index_last = -1;
+            RCLCPP_INFO(LOGGER, "jog stop");
+        }
+        jog_count_temp = jog_count;
+    }
+
+private:
+    rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr linear_move_service_;
+    rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr joint_move_service_;
+    rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr jog_service_;
+
+        
+    rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub_;
+    rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_state_pub_;
+};
+
 
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = rclcpp::Node::make_shared("jaka_driver");
-    rclcpp::Rate rate(125);
-    // robot.login_in(argv[1]);
-    string default_ip = "10.5.5.100";
-    string robot_ip = node->get_parameter("ip", default_ip).as_string();
-    robot.login_in(robot_ip.c_str());
-    robot.set_status_data_update_time_interval(100);
-    robot.set_block_wait_timeout(120);
-    robot.power_on();
-    rclcpp::sleep_for(std::chrono::milliseconds(1000));
-    robot.enable_robot();
-    //Joint-space first-order low-pass filtering in robot servo mode
-    //robot.servo_move_use_joint_LPF(2);
-    robot.servo_speed_foresight(15,0.03);
-
-    //1.1 Linear motion (in customized user coordinate system)
-    auto linear_move_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback);  //话题名
-    //1.2 Joint motion
-    auto joint_move_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/joint_move", &joint_move_callback);
-    //1.3 Jog motion
-    auto jog_service = node->create_service<jaka_msgs::srv::Move>("/jaka_driver/jog", &jog_callback);
-    //1.4 Servo Position Control Mode Enable
-    auto servo_move_enable_service = node->create_service<jaka_msgs::srv::ServoMoveEnable>("/jaka_driver/servo_move_enable", &servo_move_enable_callback);
-    //1.5 Servo-mode motion in Cartesian space
-    auto servo_p_service = node->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_p", &servo_p_callback);
-    //1.6 Joint space servo mode motion
-    auto servo_j_service = node->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_j", &servo_j_callback);
-    //1.7 stop motion
-    auto stop_move_service = node->create_service<std_srvs::srv::Empty>("/jaka_driver/stop_move", &stop_move_callback);
-    //2.1 Setting tcp parameters
-    auto set_toolframe_service = node->create_service<jaka_msgs::srv::SetTcpFrame>("/jaka_driver/set_toolframe", &set_toolFrame_callback);
-    //2.2 Setting user coordinate system parameters
-    auto set_userframe_service = node->create_service<jaka_msgs::srv::SetUserFrame>("/jaka_driver/set_userframe", &set_userFrame_callback);
-    //2.3 Set the center of gravity parameters of the robot arm load
-    auto set_payload_service = node->create_service<jaka_msgs::srv::SetPayload>("/jaka_driver/set_payload", &set_payload_callback);
-    //2.4 Set free drive mode
-    auto drag_move_service = node->create_service<std_srvs::srv::SetBool>("/jaka_driver/drag_move", &drag_mode_callback);
-    //2.5 Set collision sensitivity
-    auto set_collisionlevel_service = node->create_service<jaka_msgs::srv::SetCollision>("/jaka_driver/set_collisionlevel", &set_collisionLevel_callback);
-    //2.6 Set IO
-    auto set_io_service = node->create_service<jaka_msgs::srv::SetIO>("/jaka_driver/set_io", &set_io_callback);
-    //2.7 Get IO
-    auto get_io_service = node->create_service<jaka_msgs::srv::GetIO>("/jaka_driver/get_io", &get_io_callback);
-    //2.8 Find the positive solution
-    auto get_fk_service = node->create_service<jaka_msgs::srv::GetFK>("/jaka_driver/get_fk", &get_fk_callback)
-    //2.9 Find the inverse solution
-    auto get_ik_service = node->create_service<jaka_msgs::srv::GetIK>("/jaka_driver/get_ik", &get_ik_callback);
-    //3.1 End position pose status information reporting
-    //ros::Publisher tool_position_pub = nh.advertise<geometry_msgs::TwistStamped>("/jaka_driver/tool_position", 10);
-    //3.2 Joint status information reporting
-    //ros::Publisher joint_position_pub = nh.advertise<sensor_msgs::JointState>("/jaka_driver/joint_position", 10);
-    //3.3 Report robot event status information
-   // ros::Publisher robot_state_pub = nh.advertise<jaka_msgs::RobotMsg>("/jaka_driver/robot_states", 10);
-
-    //3.1 End position pose status information reporting
-   tool_position_pub = nh.advertise<geometry_msgs::TwistStamped>("/jaka_driver/tool_position", 10);
-    //3.2 Joint status information reporting
-    joint_position_pub = nh.advertise<sensor_msgs::JointState>("/jaka_driver/joint_position", 10);
-    //3.3 Report robot event status information
-    robot_state_pub = nh.advertise<jaka_msgs::RobotMsg>("/jaka_driver/robot_states", 10);
     
-    // Automatically stop robot jog and motion
-    ros::Timer stop_jog = nh.createTimer(ros::Duration(3), stop_jog_callback, false);
-    // Monitor network connection status
-    pthread_t conn_state_thread;
-    int ret = pthread_create(&conn_state_thread,NULL,get_conn_scoket_state,NULL);
+    RCLCPP_INFO(LOGGER, "start");
+    rclcpp::spin(std::make_shared<JakaDriver>()); 
 
-    RCLCPP_INFO(rclcpp::get_logger("jaka_driver"), "start");
-    
-    while(rclcpp::ok())
-    {   
-        // tool_position_callback(tool_position_pub);
-        // joint_position_callback(joint_position_pub);
-        // robot_states_callback(robot_state_pub);
-        rate.sleep();
-        rclcpp::spin_some();
-    }
-    
-    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
