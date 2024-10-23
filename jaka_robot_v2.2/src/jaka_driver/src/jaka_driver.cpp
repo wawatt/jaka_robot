@@ -697,15 +697,29 @@ public:
         {
             RCLCPP_ERROR(LOGGER, "login_in failed");
         }
-        robot.set_status_data_update_time_interval(100);
-        robot.set_block_wait_timeout(120);
-        robot.power_on();
+        if (robot.set_status_data_update_time_interval(100)!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "set_status_data_update_time_interval failed");
+        }
+        if (robot.set_block_wait_timeout(120)!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "set_block_wait_timeout failed");
+        }
+        if (robot.power_on()!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "power_on failed");
+        }
         rclcpp::sleep_for(std::chrono::milliseconds(1000));
-        robot.enable_robot();
+        if (robot.enable_robot()!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "enable_robot failed");
+        }
         //Joint-space first-order low-pass filtering in robot servo mode
         //robot.servo_move_use_joint_LPF(2);
-        robot.servo_speed_foresight(15,0.03);
-    
+        if (robot.servo_speed_foresight(15,0.03)!=ERR_SUCC)
+        {
+            RCLCPP_ERROR(LOGGER, "servo_speed_foresight failed");
+        }
         //1.1 Linear motion (in customized user coordinate system)
         // auto linear_move_service = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback);
         linear_move_service_ = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/linear_move", &linear_move_callback); 
@@ -714,31 +728,31 @@ public:
         //1.3 Jog motion
         jog_service_ = this->create_service<jaka_msgs::srv::Move>("/jaka_driver/jog", &jog_callback);
         //1.4 Servo Position Control Mode Enable
-        auto servo_move_enable_service = this->create_service<jaka_msgs::srv::ServoMoveEnable>("/jaka_driver/servo_move_enable", &servo_move_enable_callback);
+        servo_move_enable_service_ = this->create_service<jaka_msgs::srv::ServoMoveEnable>("/jaka_driver/servo_move_enable", &servo_move_enable_callback);
         //1.5 Servo-mode motion in Cartesian space
-        auto servo_p_service = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_p", &servo_p_callback);
+        servo_p_service_ = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_p", &servo_p_callback);
         //1.6 Joint space servo mode motion
-        auto servo_j_service = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_j", &servo_j_callback);
+        servo_j_service_ = this->create_service<jaka_msgs::srv::ServoMove>("/jaka_driver/servo_j", &servo_j_callback);
         //1.7 stop motion
-        auto stop_move_service = this->create_service<std_srvs::srv::Empty>("/jaka_driver/stop_move", &stop_move_callback);
+        stop_move_service_ = this->create_service<std_srvs::srv::Empty>("/jaka_driver/stop_move", &stop_move_callback);
         //2.1 Setting tcp parameters
-        auto set_toolframe_service = this->create_service<jaka_msgs::srv::SetTcpFrame>("/jaka_driver/set_toolframe", &set_toolFrame_callback);
+        set_toolframe_service_ = this->create_service<jaka_msgs::srv::SetTcpFrame>("/jaka_driver/set_toolframe", &set_toolFrame_callback);
         //2.2 Setting user coordinate system parameters
-        auto set_userframe_service = this->create_service<jaka_msgs::srv::SetUserFrame>("/jaka_driver/set_userframe", &set_userFrame_callback);
+        set_userframe_service_ = this->create_service<jaka_msgs::srv::SetUserFrame>("/jaka_driver/set_userframe", &set_userFrame_callback);
         //2.3 Set the center of gravity parameters of the robot arm load
-        auto set_payload_service = this->create_service<jaka_msgs::srv::SetPayload>("/jaka_driver/set_payload", &set_payload_callback);
+        set_payload_service_ = this->create_service<jaka_msgs::srv::SetPayload>("/jaka_driver/set_payload", &set_payload_callback);
         //2.4 Set free drive mode
-        auto drag_move_service = this->create_service<std_srvs::srv::SetBool>("/jaka_driver/drag_move", &drag_mode_callback);
+        drag_move_service_ = this->create_service<std_srvs::srv::SetBool>("/jaka_driver/drag_move", &drag_mode_callback);
         //2.5 Set collision sensitivity
-        auto set_collisionlevel_service = this->create_service<jaka_msgs::srv::SetCollision>("/jaka_driver/set_collisionlevel", &set_collisionLevel_callback);
+        set_collisionlevel_service_ = this->create_service<jaka_msgs::srv::SetCollision>("/jaka_driver/set_collisionlevel", &set_collisionLevel_callback);
         //2.6 Set IO
-        auto set_io_service = this->create_service<jaka_msgs::srv::SetIO>("/jaka_driver/set_io", &set_io_callback);
+        set_io_service_ = this->create_service<jaka_msgs::srv::SetIO>("/jaka_driver/set_io", &set_io_callback);
         //2.7 Get IO
-        auto get_io_service = this->create_service<jaka_msgs::srv::GetIO>("/jaka_driver/get_io", &get_io_callback);
+        get_io_service_ = this->create_service<jaka_msgs::srv::GetIO>("/jaka_driver/get_io", &get_io_callback);
         //2.8 Find the positive solution
-        auto get_fk_service = this->create_service<jaka_msgs::srv::GetFK>("/jaka_driver/get_fk", &get_fk_callback);
+        get_fk_service_ = this->create_service<jaka_msgs::srv::GetFK>("/jaka_driver/get_fk", &get_fk_callback);
         //2.9 Find the inverse solution
-        auto get_ik_service = this->create_service<jaka_msgs::srv::GetIK>("/jaka_driver/get_ik", &get_ik_callback);
+        get_ik_service_ = this->create_service<jaka_msgs::srv::GetIK>("/jaka_driver/get_ik", &get_ik_callback);
         //3.1 End position pose status information reporting
         //ros::Publisher tool_position_pub = nh.advertise<geometry_msgs::TwistStamped>("/jaka_driver/tool_position", 10);
         //3.2 Joint status information reporting
@@ -754,9 +768,10 @@ public:
         //3.3 Report robot event status information
         robot_state_pub_ = this->create_publisher<jaka_msgs::msg::RobotMsg>("/jaka_driver/robot_states", 10);
 
-        auto conn_state_timer = this->create_wall_timer(100ms, std::bind(&JakaDriver::get_conn_scoket_state, this));
+        conn_state_timer_ = this->create_wall_timer(100ms, std::bind(&JakaDriver::get_conn_scoket_state, this));
+        stop_jog_ = this->create_wall_timer(3000ms,  std::bind(&JakaDriver::stop_jog_callback, this));
+        RCLCPP_INFO(LOGGER, "inited");
         
-        auto stop_jog = this->create_wall_timer(3000ms,  std::bind(&JakaDriver::stop_jog_callback, this));
     }
     
 private:
@@ -798,7 +813,7 @@ private:
         // tool_position.twist.angular.y = v[1];
         // tool_position.twist.angular.z = v[2];
         
-        tool_position.header.stamp = rclcpp::Clock().now();
+        tool_position.header.stamp = this->now();
         tool_position_pub_->publish(tool_position);
     }
     
@@ -813,7 +828,8 @@ private:
             int j = i + 1;
             joint_position.name.push_back("joint_" + to_string(j));
         }
-        joint_position.header.stamp = rclcpp::Clock().now();
+        joint_position.header.stamp = this->now(); //rclcpp::Clock().now()不能返回仿真时间
+        // https://fishros.org.cn/forum/topic/495
         joint_position_pub_->publish(joint_position);
     }
     
@@ -883,27 +899,22 @@ private:
     void get_conn_scoket_state()
     {
         RobotStatus robot_status;
-        
-        while (rclcpp::ok())
+    
+        auto ret = robot.get_robot_status(&robot_status);
+        if (ret!=ERR_SUCC)
         {
-            int ret = robot.get_robot_status(&robot_status);
-            if (ret)
-            {
-                RCLCPP_ERROR(LOGGER, "get_robot_status error!!!");
-            }
-            else if(!robot_status.is_socket_connect)
-            {
-                RCLCPP_ERROR(LOGGER, "connect error!!!");
-            }
-            if(ret==0)
-            {
-                tool_position_callback();
-                joint_position_callback();
-                robot_states_callback();
-            
-            }
-            rclcpp::sleep_for(std::chrono::milliseconds(100));
-        }    
+            RCLCPP_ERROR(LOGGER, "get_robot_status error!!!");
+        }
+        else if(!robot_status.is_socket_connect)
+        {
+            RCLCPP_ERROR(LOGGER, "connect error!!!");
+        }
+        if(ret==ERR_SUCC)
+        {
+            tool_position_callback();
+            joint_position_callback();
+            robot_states_callback();
+        }
     }
 
     void stop_jog_callback()
@@ -923,11 +934,28 @@ private:
     rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr linear_move_service_;
     rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr joint_move_service_;
     rclcpp::Service<jaka_msgs::srv::Move>::SharedPtr jog_service_;
+    rclcpp::Service<jaka_msgs::srv::ServoMoveEnable>::SharedPtr servo_move_enable_service_;
+    rclcpp::Service<jaka_msgs::srv::ServoMove>::SharedPtr servo_p_service_;
+    rclcpp::Service<jaka_msgs::srv::ServoMove>::SharedPtr servo_j_service_;
+    rclcpp::Service<std_srvs::srv::Empty>::SharedPtr stop_move_service_;
 
+    
+    rclcpp::Service<jaka_msgs::srv::SetTcpFrame>::SharedPtr set_toolframe_service_;
+    rclcpp::Service<jaka_msgs::srv::SetUserFrame>::SharedPtr set_userframe_service_;
+    rclcpp::Service<jaka_msgs::srv::SetPayload>::SharedPtr set_payload_service_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr drag_move_service_;
+    rclcpp::Service<jaka_msgs::srv::SetCollision>::SharedPtr set_collisionlevel_service_;
+    rclcpp::Service<jaka_msgs::srv::SetIO>::SharedPtr set_io_service_;
+    rclcpp::Service<jaka_msgs::srv::GetIO>::SharedPtr get_io_service_;
+    rclcpp::Service<jaka_msgs::srv::GetFK>::SharedPtr get_fk_service_;
+    rclcpp::Service<jaka_msgs::srv::GetIK>::SharedPtr get_ik_service_;
         
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tool_position_pub_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_position_pub_;
     rclcpp::Publisher<jaka_msgs::msg::RobotMsg>::SharedPtr robot_state_pub_;
+
+    rclcpp::TimerBase::SharedPtr conn_state_timer_;
+    rclcpp::TimerBase::SharedPtr stop_jog_;
 };
 
 

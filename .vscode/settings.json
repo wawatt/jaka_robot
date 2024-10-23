@@ -1,4 +1,8 @@
 {
+
+"urdf-visualizer.packages": {
+    "jaka_description": "${workspaceFolder}/jaka_robot_v2.2/src/jaka_description"
+},
 "python.defaultInterpreterPath": "E:/ENVs/ros_env/python.exe",
 "ros.rosSetupScript": "E:/ENVs/ros_env/Library/setup.bat",
 "cmake.ignoreCMakeListsMissing": true,
