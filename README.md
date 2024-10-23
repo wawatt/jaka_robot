@@ -2,7 +2,7 @@
 For example jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_description only jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_msgs
-- [ ] jaka_robot_v2.2/src/jaka_driver
+- [x] jaka_robot_v2.2/src/jaka_driver
 - [ ] jaka_robot_v2.2/src/jaka_zu7_moveit_config
 ## run (win robostack)
 ```
