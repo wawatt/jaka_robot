@@ -4,6 +4,7 @@ For example jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_msgs
 - [x] jaka_robot_v2.2/src/jaka_driver
 - [x] jaka_robot_v2.2/src/jaka_zu7_moveit_config
+- [ ] jaka_robot_v2.2/src/jaka_planner
 ## run (win robostack)
 ```
 mamba install ros-humble-moveit ros-humble-joint-state-publisher-gui ros-humble-moveit-planners-chomp
