@@ -697,14 +697,6 @@ public:
         {
             RCLCPP_ERROR(LOGGER, "login_in failed");
         }
-        if (robot.set_status_data_update_time_interval(100)!=ERR_SUCC)
-        {
-            RCLCPP_ERROR(LOGGER, "set_status_data_update_time_interval failed");
-        }
-        if (robot.set_block_wait_timeout(120)!=ERR_SUCC)
-        {
-            RCLCPP_ERROR(LOGGER, "set_block_wait_timeout failed");
-        }
         if (robot.power_on()!=ERR_SUCC)
         {
             RCLCPP_ERROR(LOGGER, "power_on failed");
