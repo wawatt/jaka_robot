@@ -63,23 +63,23 @@ add_executable(sdk_test src/sdk_test.cpp)
 target_include_directories(sdk_test PRIVATE include)
 add_executable(client src/client.cpp)
 target_include_directories(client PRIVATE include)
-# add_executable(servoj_demo src/servoj_demo.cpp) 
-# target_include_directories(servoj_demo PRIVATE include)
+add_executable(servoj_demo src/servoj_demo.cpp) 
+target_include_directories(servoj_demo PRIVATE include)
 
 ament_target_dependencies(jaka_driver rclcpp std_msgs std_srvs jaka_msgs sensor_msgs geometry_msgs moveit_msgs)
 ament_target_dependencies(sdk_test rclcpp)
 ament_target_dependencies(client rclcpp std_msgs jaka_msgs moveit_msgs)
-# ament_target_dependencies(servoj_demo rclcpp std_msgs jaka_msgs moveit_msgs)
+ament_target_dependencies(servoj_demo rclcpp std_msgs jaka_msgs)
 
 target_link_libraries(jaka_driver jakaAPI)
 target_link_libraries(sdk_test jakaAPI)
-# target_link_libraries(servoj_demo jakaAPI)
+target_link_libraries(servoj_demo jakaAPI)
 
 install(TARGETS
   jaka_driver 
   sdk_test 
   client 
-  # servoj_demo
+  servoj_demo
 DESTINATION lib/${PROJECT_NAME})
 
 install(
