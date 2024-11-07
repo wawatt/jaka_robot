@@ -3,10 +3,11 @@ For example jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_description only jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_msgs
 - [x] jaka_robot_v2.2/src/jaka_driver
-- [ ] jaka_robot_v2.2/src/jaka_zu7_moveit_config
+- [x] jaka_robot_v2.2/src/jaka_zu7_moveit_config
 ## run (win robostack)
 ```
-mamba install ros-humble-moveit ros-humble-joint-state-publisher-gui
+mamba install ros-humble-moveit ros-humble-joint-state-publisher-gui ros-humble-moveit-planners-chomp
+
 colcon build --merge-install --cmake-args  -DCMAKE_BUILD_TYPE=Release  --event-handlers console_direct+
 call install/setup.bat
 ros2 launch jaka_description jaka_zu7_rviz_control.launch.py
