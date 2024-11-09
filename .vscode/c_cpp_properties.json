@@ -3,10 +3,10 @@
         {
             "name": "Win32",
             "includePath": [
-                // "${workspaceFolder}/**",
                 "E:/ENVs/ros_env/Library/include/**",
                 "${workspaceFolder}/jaka_robot_v2.2/install/include/**",
-                "${workspaceFolder}/jaka_robot_v2.2/src/jaka_driver/include"
+                "${workspaceFolder}/jaka_robot_v2.2/src/jaka_driver/include",
+                "${workspaceFolder}/jaka_robot_v2.2/src/jaka_planner/include"
             ],
             "defines": [
                 "_DEBUG",
