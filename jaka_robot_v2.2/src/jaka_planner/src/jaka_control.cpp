@@ -51,13 +51,13 @@ public:
         using namespace std::placeholders;
         this->action_server_ = rclcpp_action::create_server<FollowJointTrajectory>(
             this, "/jaka_"+default_model+"_controller/follow_joint_trajectory",
-            // this, "/manipulator_controller/follow_joint_trajectory",
             std::bind(&JAKA_Control::handle_goal, this, _1, _2),
             std::bind(&JAKA_Control::handle_cancel, this, _1),
             std::bind(&JAKA_Control::handle_accepted, this, _1));
         
         joint_states_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_state_timer_ = this->create_wall_timer(8ms, std::bind(&JAKA_Control::joint_states_callback, this));
+        RCLCPP_INFO(this->get_logger(), "INITED");
     }
 
     ~JAKA_Control(){}
@@ -114,22 +114,22 @@ private:
         robot_.servo_move_enable(true);
         const auto torso_goal = goal_handle->get_goal();
         auto result = std::make_shared<FollowJointTrajectory::Result>();
-        int point_num=torso_goal->trajectory.points.size();
+        size_t point_num = torso_goal->trajectory.points.size();
         RCLCPP_INFO(this->get_logger(), "number of points: %d", point_num);
         JointValue joint_pose;
-        float lastDuration=0.0;
+        double lastDuration=0.0, Duration, dt;
         OptionalCond* p = nullptr;
-        for (int i=1; i<point_num; i++) {        
+        for (size_t i=1; i<point_num; i++) {        
             joint_pose.jVal[0] = torso_goal->trajectory.points[i].positions[0];
             joint_pose.jVal[1] = torso_goal->trajectory.points[i].positions[1];
             joint_pose.jVal[2] = torso_goal->trajectory.points[i].positions[2];
             joint_pose.jVal[3] = torso_goal->trajectory.points[i].positions[3];
             joint_pose.jVal[4] = torso_goal->trajectory.points[i].positions[4];
             joint_pose.jVal[5] = torso_goal->trajectory.points[i].positions[5];      
-            float Duration = torso_goal->trajectory.points[i].time_from_start.sec + 
+            Duration = torso_goal->trajectory.points[i].time_from_start.sec + 
                 torso_goal->trajectory.points[i].time_from_start.nanosec / 1e9;
 
-            float dt = Duration-lastDuration;
+            dt = Duration-lastDuration;
             lastDuration = Duration;
 
             int step_num = int (dt/0.008); // 8ms控制周期
@@ -139,8 +139,8 @@ private:
             {
                 RCLCPP_INFO(this->get_logger(), "Servo_j Motion Failed");
             } 
-            RCLCPP_INFO(this->get_logger(), "The return status of servo_j:%d",sdk_res);
-            RCLCPP_INFO(this->get_logger(), "Accepted joint angle: %f %f %f %f %f %f %f %d", joint_pose.jVal[0],joint_pose.jVal[1],joint_pose.jVal[2],joint_pose.jVal[3],joint_pose.jVal[4],joint_pose.jVal[5],dt,step_num);
+            // RCLCPP_INFO(this->get_logger(), "The return status of servo_j:%d",sdk_res);
+            // RCLCPP_INFO(this->get_logger(), "Accepted joint angle: %f %f %f %f %f %f %f %d", joint_pose.jVal[0],joint_pose.jVal[1],joint_pose.jVal[2],joint_pose.jVal[3],joint_pose.jVal[4],joint_pose.jVal[5],dt,step_num);
         }
     
         while(rclcpp::ok())
@@ -189,7 +189,7 @@ private:
                 joint_pose.jVal[i] * 180 / PI + 0.2 > robotstatus.joint_position[i] * 180 / PI;
             joint_state = joint_state && ret; 
         }
-        cout << "Whether the robot has reached the target position: " << joint_state << endl;       //1到达；0未到达
+        // cout << "Whether the robot has reached the target position: " << joint_state << endl;       //1到达；0未到达
         return joint_state;
     }
 
@@ -206,3 +206,7 @@ int main(int argc, char** argv)
     rclcpp::shutdown();
     return 0;
 }
+// https://docs.ros.org/en/humble/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html
+// https://docs.ros.org/en/noetic/api/control_msgs/html/action/FollowJointTrajectory.html
+// https://github.com/RealManRobot/ros2_rm_robot/blob/e039009adf1cd290b95f82b6bf62b4fb1eeff7f5/rm_control/src/rm_control.cpp
+
