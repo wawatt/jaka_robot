@@ -6,9 +6,10 @@
         <ros2_control name="${name}" type="system">
             <hardware>
                 <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <plugin>mock_components/GenericSystem</plugin>
+                <!-- <plugin>mock_components/GenericSystem</plugin> -->
+                <plugin>jaka_hardware/JAKAHardwareInterface</plugin>
             </hardware>
-            <joint name="joint_1">
+            <!-- <joint name="joint_1">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint_1']}</param>
@@ -49,7 +50,7 @@
                   <param name="initial_value">${initial_positions['joint_6']}</param>
                 </state_interface>
                 <state_interface name="velocity"/>
-            </joint>
+            </joint> -->
 
         </ros2_control>
     </xacro:macro>

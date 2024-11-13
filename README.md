@@ -12,7 +12,7 @@ For example jaka_zu7
 ```
 mamba install ros-humble-moveit ros-humble-joint-state-publisher-gui ros-humble-moveit-planners-chomp
 
-colcon build --merge-install --cmake-args  -DCMAKE_BUILD_TYPE=Release  --event-handlers console_direct+
+colcon build --merge-install --cmake-args  -DCMAKE_BUILD_TYPE=Release  -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON -DBUILD_TESTING=OFF --event-handlers console_direct+
 call install/setup.bat
 ros2 launch jaka_description jaka_zu7_rviz_control.launch.py
 ```

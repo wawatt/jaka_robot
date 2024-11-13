@@ -1,0 +1,10 @@
+<library path="jaka_hardware">
+  <class name="jaka_hardware/JAKAHardwareInterface"
+         type="jaka_hardware::JAKAHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ROS2 Control HardWare Interface for JAKA ROBOT.
+    </description>
+  </class>
+
+</library>
