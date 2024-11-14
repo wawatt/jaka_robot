@@ -13,41 +13,40 @@ rclcpp::Logger JAKAHardwareInterface::getLogger() {
     return rclcpp::get_logger("JAKAHardwareInterface");
 }
 
-hardware_interface::CallbackReturn JAKAHardwareInterface::on_init(
+CallbackReturn JAKAHardwareInterface::on_init(
     const hardware_interface::HardwareInfo& info)
 {
     if (hardware_interface::SystemInterface::on_init(info) != 
-        hardware_interface::CallbackReturn::SUCCESS) {
-        return hardware_interface::CallbackReturn::ERROR;
+        CallbackReturn::SUCCESS) {
+        return CallbackReturn::ERROR;
     }
-
 
     // 初始化
     robot_ip_ = "192.168.56.101";
     if(robot_.login_in(robot_ip_.c_str())!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(),  "login_in failed");
-        return hardware_interface::CallbackReturn::FAILURE;
+        return CallbackReturn::FAILURE;
     }
     if (robot_.servo_move_use_joint_LPF(0.5)!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(),"servo_move_use_joint_LPF failed");
-        return hardware_interface::CallbackReturn::FAILURE;
+        return CallbackReturn::FAILURE;
     }
     if (robot_.power_on()!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(), "power_on failed");
-        return hardware_interface::CallbackReturn::FAILURE;
+        return CallbackReturn::FAILURE;
     }
     rclcpp::sleep_for(std::chrono::milliseconds(500));
     if (robot_.enable_robot()!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(), "enable_robot failed");
-        return hardware_interface::CallbackReturn::FAILURE;
+        return CallbackReturn::FAILURE;
     }
 
-
     hw_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+    hw_velocity_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
     hw_position_cmds_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
     for (const auto& joint : info_.joints) {
@@ -58,7 +57,7 @@ hardware_interface::CallbackReturn JAKAHardwareInterface::on_init(
                 "Joint '%s' has %zu command interfaces found. 1 expected.",
                 joint.name.c_str(), 
                 joint.command_interfaces.size());
-            return hardware_interface::CallbackReturn::ERROR;
+            return CallbackReturn::ERROR;
         }
         if (joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
         {
@@ -67,17 +66,17 @@ hardware_interface::CallbackReturn JAKAHardwareInterface::on_init(
                 joint.name.c_str(),
                 joint.command_interfaces[0].name.c_str(), 
                 hardware_interface::HW_IF_VELOCITY);
-            return hardware_interface::CallbackReturn::ERROR;
+            return CallbackReturn::ERROR;
         }
 
-        // 1个状态
-        if (joint.state_interfaces.size() != 1)
+        // 2个状态
+        if (joint.state_interfaces.size() != 2)
         {
             RCLCPP_FATAL(getLogger(),
                 "Joint '%s' has %zu state interface. 2 expected.", 
                 joint.name.c_str(),
                 joint.state_interfaces.size());
-            return hardware_interface::CallbackReturn::ERROR;
+            return CallbackReturn::ERROR;
         }
 
         if (joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION)
@@ -86,13 +85,21 @@ hardware_interface::CallbackReturn JAKAHardwareInterface::on_init(
                 "Joint '%s' have '%s' as first state interface. '%s' expected.", 
                 joint.name.c_str(),
                 joint.state_interfaces[0].name.c_str(), hardware_interface::HW_IF_POSITION);
-            return hardware_interface::CallbackReturn::ERROR;
+            return CallbackReturn::ERROR;
+        }
+        if (joint.state_interfaces[1].name != hardware_interface::HW_IF_VELOCITY)
+        {
+            RCLCPP_FATAL(getLogger(),
+                "Joint '%s' have '%s' as second state interface. '%s' expected.", 
+                joint.name.c_str(),
+                joint.state_interfaces[1].name.c_str(), hardware_interface::HW_IF_VELOCITY);
+            return CallbackReturn::ERROR;
         }
 
     }
 
     RCLCPP_INFO(getLogger(), "[%s] System Sucessfully configured!", robot_ip_.c_str());
-    return hardware_interface::CallbackReturn::ERROR;
+    return CallbackReturn::SUCCESS;
 }
 
 std::vector<hardware_interface::StateInterface> JAKAHardwareInterface::export_state_interfaces()
@@ -101,8 +108,9 @@ std::vector<hardware_interface::StateInterface> JAKAHardwareInterface::export_st
     for (auto i = 0u; i < info_.joints.size(); i++) {
         state_interfaces.emplace_back(hardware_interface::StateInterface(
             info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_position_states_[i]));
+        state_interfaces.emplace_back(hardware_interface::StateInterface(
+            info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_velocity_states_[i]));
     }
-
     return state_interfaces;
 }
 
@@ -117,57 +125,58 @@ std::vector<hardware_interface::CommandInterface> JAKAHardwareInterface::export_
     return command_interfaces;
 }
 
-hardware_interface::CallbackReturn JAKAHardwareInterface::on_activate(
-    const rclcpp_lifecycle::State & previous_state)
-{
-    RCLCPP_INFO(getLogger(), "Activating ...please wait...");
-    robot_.servo_move_enable(false);
-    // xarm_driver_.arm->motion_enable(true);
-    // xarm_driver_.arm->set_mode(velocity_control_ ? XARM_MODE::VELO_JOINT : XARM_MODE::SERVO);
-    // xarm_driver_.arm->set_state(XARM_STATE::START);
+// CallbackReturn JAKAHardwareInterface::on_activate(
+//     const rclcpp_lifecycle::State & previous_state)
+// {
+//     RCLCPP_INFO(getLogger(), "Activating ...please wait...");
+//     robot_.servo_move_enable(false);
+//     // xarm_driver_.arm->motion_enable(true);
+//     // xarm_driver_.arm->set_mode(velocity_control_ ? XARM_MODE::VELO_JOINT : XARM_MODE::SERVO);
+//     // xarm_driver_.arm->set_state(XARM_STATE::START);
 
-    // req_list_controller_ = std::make_shared<controller_manager_msgs::srv::ListControllers::Request>();
-    // res_list_controller_ = std::make_shared<controller_manager_msgs::srv::ListControllers::Response>();
-    // req_switch_controller_ = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
-    // res_switch_controller_ = std::make_shared<controller_manager_msgs::srv::SwitchController::Response>();
+//     // req_list_controller_ = std::make_shared<controller_manager_msgs::srv::ListControllers::Request>();
+//     // res_list_controller_ = std::make_shared<controller_manager_msgs::srv::ListControllers::Response>();
+//     // req_switch_controller_ = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
+//     // res_switch_controller_ = std::make_shared<controller_manager_msgs::srv::SwitchController::Response>();
 
-    // client_list_controller_ = hw_node_->create_client<controller_manager_msgs::srv::ListControllers>("/controller_manager/list_controllers");
-    // client_switch_controller_ = hw_node_->create_client<controller_manager_msgs::srv::SwitchController>("/controller_manager/switch_controller");
+//     // client_list_controller_ = hw_node_->create_client<controller_manager_msgs::srv::ListControllers>("/controller_manager/list_controllers");
+//     // client_switch_controller_ = hw_node_->create_client<controller_manager_msgs::srv::SwitchController>("/controller_manager/switch_controller");
 
-    for (auto i = 0u; i < hw_position_states_.size(); i++) {
-        if (std::isnan(hw_position_states_[i])) {
-            hw_position_states_[i] = 0;
-            hw_position_cmds_[i] = 0;
-        } else {
-            hw_position_cmds_[i] = hw_position_states_[i];
-        }
-    }
+//     for (auto i = 0u; i < hw_position_states_.size(); i++) {
+//         if (std::isnan(hw_position_states_[i])) {
+//             hw_position_states_[i] = 0;
+//             hw_position_cmds_[i] = 0;
+//         } else {
+//             hw_position_cmds_[i] = hw_position_states_[i];
+//         }
+//     }
 
-    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully activated!", robot_ip_.c_str());
-    return hardware_interface::CallbackReturn::SUCCESS;
-}
+//     RCLCPP_INFO(getLogger(), "[%s] System Sucessfully activated!", robot_ip_.c_str());
+//     return CallbackReturn::SUCCESS;
+// }
 
-hardware_interface::CallbackReturn JAKAHardwareInterface::on_deactivate(
-    const rclcpp_lifecycle::State& previous_state)
-{
-    RCLCPP_INFO(getLogger(), "[%s] Stopping ...please wait...", robot_ip_.c_str());
+// CallbackReturn JAKAHardwareInterface::on_deactivate(
+//     const rclcpp_lifecycle::State& previous_state)
+// {
+//     RCLCPP_INFO(getLogger(), "[%s] Stopping ...please wait...", robot_ip_.c_str());
 
-    // xarm_driver_.arm->set_mode(XARM_MODE::POSE);
-    robot_.servo_move_enable(false);
-    RCLCPP_INFO(getLogger(), "[%s] System sucessfully stopped!", robot_ip_.c_str());
-    return hardware_interface::CallbackReturn::SUCCESS;
-}
+//     // xarm_driver_.arm->set_mode(XARM_MODE::POSE);
+//     robot_.servo_move_enable(false);
+//     RCLCPP_INFO(getLogger(), "[%s] System sucessfully stopped!", robot_ip_.c_str());
+//     return CallbackReturn::SUCCESS;
+// }
 
 hardware_interface::return_type JAKAHardwareInterface::read(
-    const rclcpp::Time & /*time*/, const rclcpp::Duration & period)
+    const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
     RobotStatus robotstatus;
     robot_.get_robot_status(&robotstatus);
 
-    for (std::size_t i = 0; i < hw_position_states_.size(); i++)
+    for (auto i = 0u; i < hw_position_states_.size(); i++)
     {
         hw_position_states_[i] = robotstatus.joint_position[i];
+        hw_velocity_states_[i] = 0;
     }
 
     return hardware_interface::return_type::OK;
@@ -176,13 +185,24 @@ hardware_interface::return_type JAKAHardwareInterface::read(
 hardware_interface::return_type JAKAHardwareInterface::write(
     const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-    // hw_position_cmds_
-    JointValue joint_pose;
-    for (auto i=0; i<6 ;i++)
-    {
-        joint_pose.jVal[i] =  hw_position_cmds_[i];
-    }
-    int sdk_res = robot_.servo_j(&joint_pose, MoveMode::ABS, step_num);
+    // RCLCPP_INFO(getLogger(), "TIME   %d s %d nanos", time.seconds() , time.nanoseconds());
+    // RCLCPP_INFO(getLogger(), "period %d s %d nanos", period.seconds() , period.nanoseconds());
+    // const auto diff = std::transform_reduce(
+    //     hw_position_states_[0].cbegin(), hw_position_states_[0].cend(),
+    //     hw_position_cmds_[0].cbegin(), 0.0,
+    //     [](const auto d1, const auto d2) { return std::abs(d1) + std::abs(d2); }, std::minus<double>{});
+    // if (diff <= trigger_joint_command_threshold_)
+    // {
+    //     return hardware_interface::return_type::OK;
+    // }
+
+    RCLCPP_INFO(getLogger(), "%f", hw_position_cmds_[0]);
+    // JointValue joint_pose;
+    // for (auto i=0; i<6 ;i++)
+    // {
+    //     joint_pose.jVal[i] =  hw_position_cmds_[i];
+    // }
+    // int sdk_res = robot_.servo_j(&joint_pose, MoveMode::ABS, step_num);
 
     // if (_need_reset()) {
     //     if (initialized_) reload_controller_ = true;

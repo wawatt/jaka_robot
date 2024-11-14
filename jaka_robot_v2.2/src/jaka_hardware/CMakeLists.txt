@@ -15,6 +15,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 # find dependencies
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
@@ -31,49 +33,37 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
 
-include_directories(
-  include/jaka_hardware
-)
 link_directories(
   lib
 )
 
+###########
+## Build ##
+###########
+
+# Declare a C++ library
 add_library(
-  jaka_hardware
-  SHARED
+  ${PROJECT_NAME} SHARED
   src/jaka_hardware_interface.cpp
 )
-target_include_directories(
-  jaka_hardware
-  PRIVATE
-  include
-  # ${xarm_sdk_INCLUDE_DIRS}
-  # ${xarm_api_INCLUDE_DIRS}
-  # ${ament_INCLUDE_DIRS}
-)
-
-ament_target_dependencies(
-  jaka_hardware PUBLIC
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
-
-target_link_libraries(jaka_hardware PUBLIC jakaAPI)
+ament_target_dependencies(${PROJECT_NAME} ${THIS_PACKAGE_INCLUDE_DEPENDS})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+          $<INSTALL_INTERFACE:include>)
+target_link_libraries(${PROJECT_NAME} jakaAPI.lib)
 
 # message(STATUS "xarm_sdk_INCLUDE_DIRS: ${xarm_sdk_INCLUDE_DIRS}")
 # message(WARNING "xarm_api_INCLUDE_DIRS: ${xarm_api_INCLUDE_DIRS}")
 # message(WARNING "xarm_sdk_LIBRARIES: ${xarm_sdk_LIBRARIES}")
 # message(WARNING "xarm_api_LIBRARIES: ${xarm_api_LIBRARIES}")
 
-pluginlib_export_plugin_description_file(
-  hardware_interface jaka_hardware_plugins.xml)
+#############
+## Install ##
+#############
 
 install(
-  DIRECTORY include/
-  DESTINATION include
-)
-
-install(
-  TARGETS jaka_hardware
+  TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}Targets
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -81,12 +71,12 @@ install(
 
 install(
   FILES lib/jakaAPI.dll
-  DESTINATION lib/${PROJECT_NAME}
-)  
+  DESTINATION bin
+)
 
 install(DIRECTORY
   launch
-  DESTINATION share/${PROJECT_NAME}/
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
@@ -101,7 +91,9 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_include_directories(include)
-ament_export_libraries(jaka_hardware)
-ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
+pluginlib_export_plugin_description_file(
+  hardware_interface jaka_hardware_plugins.xml)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(${PROJECT_NAME}Targets HAS_LIBRARY_TARGET)
+ament_export_dependencies(${PROJECT_NAME} ${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()

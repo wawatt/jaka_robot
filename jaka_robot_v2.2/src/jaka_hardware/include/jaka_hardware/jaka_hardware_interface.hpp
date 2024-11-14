@@ -1,5 +1,4 @@
-#ifndef __JAKA_HARDWARE_INTERFACE_HPP__
-#define __JAKA_HARDWARE_INTERFACE_HPP__
+#pragma once
 
 #include <memory>
 #include <string>
@@ -21,7 +20,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 
 
-#include "visibility_control.h"
+// #include "visibility_control.h"
 // #include "controller_manager_msgs/srv/list_controllers.hpp"
 // #include "controller_manager_msgs/srv/switch_controller.hpp"
 // #include "xarm_api/xarm_driver.h"
@@ -31,34 +30,36 @@
 
 namespace jaka_hardware
 {
+using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+
 class JAKAHardwareInterface : public hardware_interface::SystemInterface
 {
 public:
-    RCLCPP_SHARED_PTR_DEFINITIONS(JAKAHardwareInterface)
+    // RCLCPP_SHARED_PTR_DEFINITIONS(JAKAHardwareInterface)
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
-    hardware_interface::CallbackReturn on_init(
+    // JAKA_HARDWARE_INTERFACE_PUBLIC
+    CallbackReturn on_init(
         const hardware_interface::HardwareInfo & info) override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
+    // JAKA_HARDWARE_INTERFACE_PUBLIC
     std::vector<hardware_interface::StateInterface> export_state_interfaces() override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
+    // JAKA_HARDWARE_INTERFACE_PUBLIC
     std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
-    hardware_interface::CallbackReturn on_activate(
-        const rclcpp_lifecycle::State & previous_state) override;
+    // // JAKA_HARDWARE_INTERFACE_PUBLIC
+    // hardware_interface::CallbackReturn on_activate(
+    //     const rclcpp_lifecycle::State & previous_state) override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
-    hardware_interface::CallbackReturn on_deactivate(
-        const rclcpp_lifecycle::State & previous_state) override;
+    // // JAKA_HARDWARE_INTERFACE_PUBLIC
+    // hardware_interface::CallbackReturn on_deactivate(
+    //     const rclcpp_lifecycle::State & previous_state) override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
+    // JAKA_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::return_type read(
-        const rclcpp::Time & /*time*/, const rclcpp::Duration & period) override;
+        const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override;
 
-    JAKA_HARDWARE_INTERFACE_PUBLIC
+    // JAKA_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::return_type write(
         const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override;
 
@@ -69,7 +70,7 @@ private:
 
     std::vector<double> hw_position_cmds_;
     std::vector<double> hw_position_states_;
-
+    std::vector<double> hw_velocity_states_;
     // bool velocity_control_;
     // bool initialized_;
     // bool read_ready_;
@@ -118,9 +119,3 @@ private:
     static rclcpp::Logger getLogger();
 };
 }
-
-// #include "pluginlib/class_list_macros.hpp"
-
-// PLUGINLIB_EXPORT_CLASS(jaka_hardware::JAKAHardwareInterface, hardware_interface::SystemInterface)
-
-#endif // __JAKA_HARDWARE_INTERFACE_HPP__
