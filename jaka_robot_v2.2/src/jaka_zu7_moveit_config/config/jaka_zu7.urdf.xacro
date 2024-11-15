@@ -9,6 +9,6 @@
     <xacro:include filename="jaka_zu7.ros2_control.xacro" />
 
 
-    <xacro:jaka_zu7_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+    <xacro:jaka_zu7_ros2_control name="JakaSystem" initial_positions_file="$(arg initial_positions_file)"/>
 
 </robot>

@@ -65,8 +65,14 @@ public:
 
 
 private:
-    std::string robot_ip_;
+
+    std::shared_ptr<rclcpp::Node> node_;
+
     JAKAZuRobot robot_;
+    bool initialized_=false;
+
+    JointValue prev_cmds_;
+    double diff_threshold_=0.0001;
 
     std::vector<double> hw_position_cmds_;
     std::vector<double> hw_position_states_;

@@ -6,7 +6,8 @@ For example jaka_zu7
 - [x] jaka_robot_v2.2/src/jaka_zu7_moveit_config
 - [x] using SDK v2.1.14 now
 - [x] jaka_robot_v2.2/src/jaka_planner
-- [ ] fix moveit2 + real arm bugs
+- [x] fix moveit2 + real arm bugs
+- [x] jaka_hardware ros2_control
 
 ## Preparation (win robostack)
 ```
@@ -32,12 +33,24 @@ ros2 service call /jaka_driver/get_fk jaka_msgs/srv/GetFK "{joint: [0,1.57,-1.57
 ros2 service call /jaka_driver/get_ik jaka_msgs/srv/GetIK "{ref_joint: [0,1.57,-1.57,1.57,1.57,0], cartesian_pose: [130.7,116,291,3.13,0,-1.5707]}"
 ```
 
-## MoveIt2 + Real Arm
+## MoveIt2 + Real Arm by moveit action
+
+```xml jaka_robot_v2.2\src\jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
+<xacro:jaka_zu7_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+```
+run
 ```
 ros2 launch jaka_zu7_moveit_config demo.launch.py
 ros2 launch jaka_planner moveit_server.launch.py ip:=192.168.56.101 model:=zu7
 ```
 
+## MoveIt2 + Real Arm by ros2_control
+```xml jaka_robot_v2.2\src\jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
+<xacro:jaka_zu7_ros2_control name="JakaSystem" initial_positions_file="$(arg initial_positions_file)"/>
+```
+```
+ros2 launch jaka_zu7_moveit_config demo.launch.py
+```
 
 # jaka_robot
 * Latest package: jaka_robot_v2.2 (Includes documents and source code)  

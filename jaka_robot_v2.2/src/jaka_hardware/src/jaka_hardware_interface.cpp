@@ -22,15 +22,17 @@ CallbackReturn JAKAHardwareInterface::on_init(
     }
 
     // 初始化
-    robot_ip_ = "192.168.56.101";
-    if(robot_.login_in(robot_ip_.c_str())!=ERR_SUCC)
+    const auto get_hardware_parameter = [this](const std::string& parameter_name, const std::string& default_value) {
+        if (auto it = info_.hardware_parameters.find(parameter_name); it != info_.hardware_parameters.end())
+        {
+        return it->second;
+        }
+        return default_value;
+    };
+    auto robot_ip = get_hardware_parameter("robot_ip", "10.5.5.100");
+    if(robot_.login_in(robot_ip.c_str())!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(),  "login_in failed");
-        return CallbackReturn::FAILURE;
-    }
-    if (robot_.servo_move_use_joint_LPF(0.5)!=ERR_SUCC)
-    {
-        RCLCPP_FATAL(getLogger(),"servo_move_use_joint_LPF failed");
         return CallbackReturn::FAILURE;
     }
     if (robot_.power_on()!=ERR_SUCC)
@@ -38,12 +40,20 @@ CallbackReturn JAKAHardwareInterface::on_init(
         RCLCPP_FATAL(getLogger(), "power_on failed");
         return CallbackReturn::FAILURE;
     }
-    rclcpp::sleep_for(std::chrono::milliseconds(500));
     if (robot_.enable_robot()!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(), "enable_robot failed");
         return CallbackReturn::FAILURE;
     }
+    robot_.servo_move_enable(false);
+    robot_.servo_speed_foresight(15,0.03);
+    if (robot_.servo_move_enable(true)!=ERR_SUCC)
+    {
+        RCLCPP_FATAL(getLogger(), "servo_move_enable failed");
+        return CallbackReturn::FAILURE;
+    }
+
+    memset(prev_cmds_.jVal, 0, sizeof(prev_cmds_.jVal));
 
     hw_position_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
     hw_velocity_states_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -98,7 +108,9 @@ CallbackReturn JAKAHardwareInterface::on_init(
 
     }
 
-    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully configured!", robot_ip_.c_str());
+    initialized_ = true;
+    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully configured!", robot_ip.c_str());
+    
     return CallbackReturn::SUCCESS;
 }
 
@@ -170,12 +182,13 @@ hardware_interface::return_type JAKAHardwareInterface::read(
     const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
 
-    RobotStatus robotstatus;
-    robot_.get_robot_status(&robotstatus);
-
+    // RobotStatus robotstatus;
+    // robot_.get_robot_status(&robotstatus);
+    JointValue cur_jval;
+    robot_.get_joint_position(&cur_jval);
     for (auto i = 0u; i < hw_position_states_.size(); i++)
     {
-        hw_position_states_[i] = robotstatus.joint_position[i];
+        hw_position_states_[i] = cur_jval.jVal[i];
         hw_velocity_states_[i] = 0;
     }
 
@@ -185,74 +198,29 @@ hardware_interface::return_type JAKAHardwareInterface::read(
 hardware_interface::return_type JAKAHardwareInterface::write(
     const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-    // RCLCPP_INFO(getLogger(), "TIME   %d s %d nanos", time.seconds() , time.nanoseconds());
-    // RCLCPP_INFO(getLogger(), "period %d s %d nanos", period.seconds() , period.nanoseconds());
-    // const auto diff = std::transform_reduce(
-    //     hw_position_states_[0].cbegin(), hw_position_states_[0].cend(),
-    //     hw_position_cmds_[0].cbegin(), 0.0,
-    //     [](const auto d1, const auto d2) { return std::abs(d1) + std::abs(d2); }, std::minus<double>{});
-    // if (diff <= trigger_joint_command_threshold_)
-    // {
-    //     return hardware_interface::return_type::OK;
-    // }
+    if (!initialized_)
+    {
+        return hardware_interface::return_type::OK;
+    }
 
-    RCLCPP_INFO(getLogger(), "%f", hw_position_cmds_[0]);
-    // JointValue joint_pose;
-    // for (auto i=0; i<6 ;i++)
-    // {
-    //     joint_pose.jVal[i] =  hw_position_cmds_[i];
-    // }
-    // int sdk_res = robot_.servo_j(&joint_pose, MoveMode::ABS, step_num);
+    bool cmds_changed = false;
+    for (int i = 0; i < 6; i++) {
+        if (std::abs(prev_cmds_.jVal[i] - hw_position_cmds_[i]) > diff_threshold_) 
+            cmds_changed = true;
+        prev_cmds_.jVal[i] = hw_position_cmds_[i];
+    }
 
-    // if (_need_reset()) {
-    //     if (initialized_) reload_controller_ = true;
-    //     initialized_ = false;
-    //     return hardware_interface::return_type::OK;
-    // }
-    // initialized_ = true;
-        
-        // std::string pos_str = "[ ";
-        // std::string vel_str = "[ ";
-        // for (int i = 0; i < position_cmds_.size(); i++) { 
-        //     pos_str += std::to_string(position_cmds_[i]); 
-        //     pos_str += " ";
-        //     vel_str += std::to_string(velocity_cmds_[i]); 
-        //     vel_str += " ";
-        // }
-        // pos_str += "]";
-        // vel_str += "]";
-        // RCLCPP_INFO(LOGGER, "[%s] positon: %s, velocity: %s", robot_ip_.c_str(), pos_str.c_str(), vel_str.c_str());
-
-        // int cmd_ret = 0;
-        // if (velocity_control_) {
-        //     for (int i = 0; i < velocity_cmds_.size(); i++) { 
-        //         cmds_float_[i] = (float)velocity_cmds_[i];
-        //     }
-        //     // RCLCPP_INFO(LOGGER, "[%s] velocity: %s", robot_ip_.c_str(), vel_str.c_str());
-        //     cmd_ret = xarm_driver_.arm->vc_set_joint_velocity(cmds_float_, true, VELO_DURATION);
-        //     if (cmd_ret != 0) {
-        //         RCLCPP_WARN(LOGGER, "[%s] vc_set_joint_velocity, ret=%d", robot_ip_.c_str(), cmd_ret);
-        //     }
-        // }
-        // else {
-        //     for (int i = 0; i < position_cmds_.size(); i++) { 
-        //         cmds_float_[i] = (float)position_cmds_[i];
-        //     }
-        //     curr_write_time_ = node_->get_clock()->now();
-        //     if (curr_write_time_.seconds() - prev_write_time_.seconds() > 1 || _check_cmds_is_change(prev_cmds_float_, cmds_float_)) {
-        //         // RCLCPP_INFO(LOGGER, "[%s] positon: %s", robot_ip_.c_str(), pos_str.c_str());
-        //         cmd_ret = xarm_driver_.arm->set_servo_angle_j(cmds_float_, 0, 0, 0);
-        //         if (cmd_ret != 0) {
-        //             RCLCPP_WARN(LOGGER, "[%s] set_servo_angle_j, ret= %d", robot_ip_.c_str(), cmd_ret);
-        //         }
-        //         if (cmd_ret == 0) {
-        //             prev_write_time_ = curr_write_time_;
-        //             for (int i = 0; i < 7; i++) { 
-        //                 prev_cmds_float_[i] = (float)cmds_float_[i];
-        //             }
-        //         }
-        //     }
-        // }
+    if (cmds_changed)
+    {    
+        auto ret = robot_.servo_j(&prev_cmds_, MoveMode::ABS);
+        if (ret!=ERR_SUCC)
+        {
+            // ErrorCode error_code;
+            // robot_.get_last_error(&error_code);
+            RCLCPP_FATAL(getLogger(), "servo_j failed: %d");
+            return hardware_interface::return_type::ERROR;
+        }
+    }
 
     return hardware_interface::return_type::OK;
 }
