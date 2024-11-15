@@ -231,14 +231,33 @@ public:
 	*
 	* @return Indicate the status of operation. ERR_SUCC for success and other for failure.
 	*/
-	errno_t jog(int aj_num, MoveMode move_mode, CoordType coord_type, double vel_cmd, double pos_cmd);
+	errno_t get_robot_state(RobotState* state);
+
+	/**
+    * @brief Get the Denavit–Hartenberg parameters of the cobot.
+	*
+	* @param dhParam Pointer of a varible to save the returned Denavit–Hartenberg parameters.
+	*
+	* @return Indicate the status of operation. ERR_SUCC for success and other for failure.
+	*/
+	errno_t get_dh_param(DHParam* dh_param);
+
+	/**
+	* @brief Set installation (or mounting) angle of the cobot.
+	*
+    * @param angleX Rotation angle around the X-axis
+    * @param angleZ Rotation angle around the Z-axis
+	*
+	* @return Indicate the status of operation. ERR_SUCC for success and other for failure.
+	*/
+	errno_t set_installation_angle(double angleX, double angleZ);
 
 	/**
 	* @brief Stop the ongoing jog movement.
 	*
 	* @return Indicate the status of operation. ERR_SUCC for success and other for failure.
 	*/
-	errno_t jog_stop(int num);
+	errno_t get_installation_angle(Quaternion* quat, Rpy* appang);
 
 	/**
 	* @brief Move the cobot in joint space, without consideration of the path of TCP in Cartesian space.
