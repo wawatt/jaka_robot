@@ -58,7 +58,8 @@ ros2 launch jaka_zu7_moveit_config demo.launch.py
 ros2 launch jaka_zu7_moveit_config demo.launch.py
 ```
 
-# jaka_robot
-* Latest package: jaka_robot_v2.2 (Includes documents and source code)  
-* Remember to compile the first time you use it.
-* ROS1 support only
+# References
+1. https://github.com/JakaCobot/jaka_robot
+2. https://github.com/xArm-Developer/xarm_ros2
+3. https://moveit.picknik.ai/main/doc/how_to_guides/isaac_panda/isaac_panda_tutorial.html
+4. https://github.com/PickNikRobotics/topic_based_ros2_control
