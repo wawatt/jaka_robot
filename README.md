@@ -34,20 +34,26 @@ ros2 service call /jaka_driver/get_ik jaka_msgs/srv/GetIK "{ref_joint: [0,1.57,-
 ```
 
 ## MoveIt2 + Real Arm by moveit action
-
+1. define name="FakeSystem"
 ```xml jaka_robot_v2.2\src\jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
 <xacro:jaka_zu7_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
 ```
-run
+2. run
 ```
-ros2 launch jaka_zu7_moveit_config demo.launch.py
 ros2 launch jaka_planner moveit_server.launch.py ip:=192.168.56.101 model:=zu7
+ros2 launch jaka_zu7_moveit_config demo.launch.py
 ```
 
 ## MoveIt2 + Real Arm by ros2_control
-```xml jaka_robot_v2.2\src\jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
+1. define name="JakaSystem"
+```xml jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
 <xacro:jaka_zu7_ros2_control name="JakaSystem" initial_positions_file="$(arg initial_positions_file)"/>
 ```
+2. set your robot ip
+```xml jaka_zu7_moveit_config\config\jaka_zu7.ros2_control.xacro
+<param name="robot_ip">"192.168.56.101"</param>
+```
+3. run
 ```
 ros2 launch jaka_zu7_moveit_config demo.launch.py
 ```
