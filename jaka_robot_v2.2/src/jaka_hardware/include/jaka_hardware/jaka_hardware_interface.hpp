@@ -48,20 +48,20 @@ public:
     std::vector<hardware_interface::CommandInterface> export_command_interfaces() override;
 
     // // JAKA_HARDWARE_INTERFACE_PUBLIC
-    // hardware_interface::CallbackReturn on_activate(
-    //     const rclcpp_lifecycle::State & previous_state) override;
+    hardware_interface::CallbackReturn on_activate(
+        const rclcpp_lifecycle::State & /*previous_state*/) override;
 
     // // JAKA_HARDWARE_INTERFACE_PUBLIC
-    // hardware_interface::CallbackReturn on_deactivate(
-    //     const rclcpp_lifecycle::State & previous_state) override;
+    hardware_interface::CallbackReturn on_deactivate(
+        const rclcpp_lifecycle::State & /*previous_state*/) override;
 
     // JAKA_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::return_type read(
-        const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override;
+        const rclcpp::Time & time, const rclcpp::Duration & /*period*/) override;
 
     // JAKA_HARDWARE_INTERFACE_PUBLIC
     hardware_interface::return_type write(
-        const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override;
+        const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 
 private:
@@ -69,6 +69,7 @@ private:
     std::shared_ptr<rclcpp::Node> node_;
 
     JAKAZuRobot robot_;
+    std::string robot_ip_;
     bool initialized_=false;
 
     JointValue prev_cmds_;
@@ -92,10 +93,14 @@ private:
     // float curr_read_velocity_[7];
     // float curr_read_effort_[7];
     
-    // rclcpp::Time prev_read_time_;
+    // https://control.ros.org/master/doc/ros2_control/hardware_interface/doc/different_update_rates_userdoc.html
+    rclcpp::Duration desired_hw_read_period_s_  = rclcpp::Duration(0,1000);
+    rclcpp::Duration desired_hw_write_period_s_ = rclcpp::Duration(0,1000);
     // rclcpp::Time curr_read_time_;
+    rclcpp::Time last_read_time_;
     // rclcpp::Time curr_write_time_;
-    // rclcpp::Time prev_write_time_;
+    rclcpp::Time last_write_time_;
+    bool first_read_pass_, first_write_pass_ = true;
 
     // std::shared_ptr<rclcpp::Node> node_;
     // std::shared_ptr<rclcpp::Node> hw_node_;

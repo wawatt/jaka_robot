@@ -130,6 +130,7 @@ private:
                 torso_goal->trajectory.points[i].time_from_start.nanosec / 1e9;
 
             dt = Duration-lastDuration;
+            RCLCPP_INFO(this->get_logger(), "xxxxxxxxxxxxxx:%f",dt);
             lastDuration = Duration;
 
             int step_num = int (dt/0.008); // 8ms控制周期
@@ -137,7 +138,7 @@ private:
 
             if (sdk_res != ERR_SUCC)
             {
-                RCLCPP_INFO(this->get_logger(), "Servo_j Motion Failed");
+                RCLCPP_INFO(this->get_logger(), "Servo_j Motion Failed: %d", sdk_res);
             } 
             // RCLCPP_INFO(this->get_logger(), "The return status of servo_j:%d",sdk_res);
             // RCLCPP_INFO(this->get_logger(), "Accepted joint angle: %f %f %f %f %f %f %f %d", joint_pose.jVal[0],joint_pose.jVal[1],joint_pose.jVal[2],joint_pose.jVal[3],joint_pose.jVal[4],joint_pose.jVal[5],dt,step_num);

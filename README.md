@@ -7,7 +7,7 @@ For example jaka_zu7
 - [x] using SDK v2.1.14 now
 - [x] jaka_robot_v2.2/src/jaka_planner
 - [x] fix moveit2 + real arm bugs
-- [x] jaka_hardware ros2_control
+- [x] jaka_hardware ros2_control 【Recommended】
 
 ## Preparation (win robostack)
 ```
@@ -44,7 +44,7 @@ ros2 launch jaka_planner moveit_server.launch.py ip:=192.168.56.101 model:=zu7
 ros2 launch jaka_zu7_moveit_config demo.launch.py
 ```
 
-## MoveIt2 + Real Arm by ros2_control
+## MoveIt2 + Real Arm by ros2_control 【Recommended】
 1. define name="JakaSystem"
 ```xml jaka_zu7_moveit_config\config\jaka_zu7.urdf.xacro 
 <xacro:jaka_zu7_ros2_control name="JakaSystem" initial_positions_file="$(arg initial_positions_file)"/>

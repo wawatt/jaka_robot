@@ -29,8 +29,12 @@ CallbackReturn JAKAHardwareInterface::on_init(
         }
         return default_value;
     };
-    auto robot_ip = get_hardware_parameter("robot_ip", "10.5.5.100");
-    if(robot_.login_in(robot_ip.c_str())!=ERR_SUCC)
+
+    robot_ip_ = get_hardware_parameter("robot_ip", "10.5.5.100");
+    desired_hw_read_period_s_ =  rclcpp::Duration::from_seconds(std::stod(info_.hardware_parameters["desired_hw_read_period_s"]));
+    desired_hw_write_period_s_ = rclcpp::Duration::from_seconds(std::stod(info_.hardware_parameters["desired_hw_write_period_s"]));
+
+    if(robot_.login_in(robot_ip_.c_str())!=ERR_SUCC)
     {
         RCLCPP_FATAL(getLogger(),  "login_in failed");
         return CallbackReturn::FAILURE;
@@ -109,7 +113,7 @@ CallbackReturn JAKAHardwareInterface::on_init(
     }
 
     initialized_ = true;
-    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully configured!", robot_ip.c_str());
+    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully configured!", robot_ip_.c_str());
     
     return CallbackReturn::SUCCESS;
 }
@@ -137,11 +141,13 @@ std::vector<hardware_interface::CommandInterface> JAKAHardwareInterface::export_
     return command_interfaces;
 }
 
-// CallbackReturn JAKAHardwareInterface::on_activate(
-//     const rclcpp_lifecycle::State & previous_state)
-// {
-//     RCLCPP_INFO(getLogger(), "Activating ...please wait...");
-//     robot_.servo_move_enable(false);
+CallbackReturn JAKAHardwareInterface::on_activate(
+    const rclcpp_lifecycle::State & /*previous_state*/)
+{
+    RCLCPP_INFO(getLogger(), "Activating ...please wait...");
+    first_read_pass_ = first_write_pass_ = true;
+    robot_.servo_move_enable(true);
+
 //     // xarm_driver_.arm->motion_enable(true);
 //     // xarm_driver_.arm->set_mode(velocity_control_ ? XARM_MODE::VELO_JOINT : XARM_MODE::SERVO);
 //     // xarm_driver_.arm->set_state(XARM_STATE::START);
@@ -163,64 +169,82 @@ std::vector<hardware_interface::CommandInterface> JAKAHardwareInterface::export_
 //         }
 //     }
 
-//     RCLCPP_INFO(getLogger(), "[%s] System Sucessfully activated!", robot_ip_.c_str());
-//     return CallbackReturn::SUCCESS;
-// }
+    RCLCPP_INFO(getLogger(), "[%s] System Sucessfully activated!", robot_ip_.c_str());
+    return CallbackReturn::SUCCESS;
+}
 
-// CallbackReturn JAKAHardwareInterface::on_deactivate(
-//     const rclcpp_lifecycle::State& previous_state)
-// {
-//     RCLCPP_INFO(getLogger(), "[%s] Stopping ...please wait...", robot_ip_.c_str());
+CallbackReturn JAKAHardwareInterface::on_deactivate(
+    const rclcpp_lifecycle::State& /*previous_state*/)
+{
+    RCLCPP_INFO(getLogger(), "[%s] Stopping ...please wait...", robot_ip_.c_str());
 
-//     // xarm_driver_.arm->set_mode(XARM_MODE::POSE);
-//     robot_.servo_move_enable(false);
-//     RCLCPP_INFO(getLogger(), "[%s] System sucessfully stopped!", robot_ip_.c_str());
-//     return CallbackReturn::SUCCESS;
-// }
+    robot_.servo_move_enable(false);
+
+    RCLCPP_INFO(getLogger(), "[%s] System sucessfully stopped!", robot_ip_.c_str());
+    return CallbackReturn::SUCCESS;
+}
 
 hardware_interface::return_type JAKAHardwareInterface::read(
-    const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+    const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
 {
 
-    // RobotStatus robotstatus;
-    // robot_.get_robot_status(&robotstatus);
-    JointValue cur_jval;
-    robot_.get_joint_position(&cur_jval);
-    for (auto i = 0u; i < hw_position_states_.size(); i++)
+    if (first_read_pass_ || (time - last_read_time_ ) > desired_hw_read_period_s_)
     {
-        hw_position_states_[i] = cur_jval.jVal[i];
-        hw_velocity_states_[i] = 0;
+        first_read_pass_ = false;
+        //   declaration in *.hpp file --> rclcpp::Time last_read_time_ ;
+        last_read_time_ = time;
+        // hardware comms and operations
+        JointValue cur_jval;
+        robot_.get_joint_position(&cur_jval);
+        for (auto i = 0u; i < hw_position_states_.size(); i++)
+        {
+            hw_position_states_[i] = cur_jval.jVal[i];
+            hw_velocity_states_[i] = 0;
+        }
     }
-
+        
     return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type JAKAHardwareInterface::write(
-    const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+    const rclcpp::Time & time, const rclcpp::Duration & period)
 {
     if (!initialized_)
     {
         return hardware_interface::return_type::OK;
     }
 
-    bool cmds_changed = false;
-    for (int i = 0; i < 6; i++) {
-        if (std::abs(prev_cmds_.jVal[i] - hw_position_cmds_[i]) > diff_threshold_) 
-            cmds_changed = true;
-        prev_cmds_.jVal[i] = hw_position_cmds_[i];
-    }
+    if (first_write_pass_ || (time - last_write_time_ ) > desired_hw_write_period_s_)
+    {
+        
+        first_write_pass_ = false;
+        // hardware comms and operations
 
-    if (cmds_changed)
-    {    
-        auto ret = robot_.servo_j(&prev_cmds_, MoveMode::ABS);
-        if (ret!=ERR_SUCC)
-        {
-            // ErrorCode error_code;
-            // robot_.get_last_error(&error_code);
-            RCLCPP_FATAL(getLogger(), "servo_j failed: %d");
-            return hardware_interface::return_type::ERROR;
+        // 大于一定偏差，再运动
+        bool cmds_changed = false;
+        for (int i = 0; i < 6; i++) {
+            if (std::abs(hw_position_states_[i] - hw_position_cmds_[i]) > diff_threshold_) 
+                cmds_changed = true;
+            prev_cmds_.jVal[i] = hw_position_cmds_[i];
         }
-    }
+
+        if (cmds_changed)
+        {    
+            // RCLCPP_INFO(getLogger(), "time since epoch: %f s", time.seconds());
+            // RCLCPP_INFO(getLogger(), "Dura since last input: %f s", period.seconds());
+
+            // unsigned int step_num = (time - last_write_time_ ).seconds() / 0.008;
+            auto ret = robot_.servo_j(&prev_cmds_, MoveMode::ABS);//, (step_num > 1) ? step_num : 1);// 8ms 控制周期
+
+            if (ret!=ERR_SUCC)
+            {
+                RCLCPP_FATAL(getLogger(), "servo_j failed: %d", ret);
+                return hardware_interface::return_type::ERROR;
+            }
+        }
+
+        last_write_time_ = time;
+    }     
 
     return hardware_interface::return_type::OK;
 }

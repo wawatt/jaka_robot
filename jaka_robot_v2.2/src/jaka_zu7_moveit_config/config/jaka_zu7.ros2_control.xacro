@@ -12,6 +12,8 @@
                 <xacro:if value="${name == 'JakaSystem'}">
                   <plugin>jaka_hardware/JAKAHardwareInterface</plugin>
                   <param name="robot_ip">"192.168.56.101"</param>
+                  <param name="desired_hw_read_period_s">0.005</param>
+                  <param name="desired_hw_write_period_s">0.005</param>
                 </xacro:if>
             </hardware>
             <joint name="joint_1">
